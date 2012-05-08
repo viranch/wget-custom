@@ -845,6 +845,9 @@ get_eta (int *bcd)
 #ifndef MAX
 # define MAX(a, b) ((a) >= (b) ? (a) : (b))
 #endif
+#ifndef MIN
+# define MIN(a, b) ((a) <= (b) ? (a) : (b))
+#endif
 
 static void
 create_image (struct bar_progress *bp, double dl_total_time, bool done)
@@ -852,16 +855,21 @@ create_image (struct bar_progress *bp, double dl_total_time, bool done)
   char *p = bp->buffer;
   wgint size = bp->initial_length + bp->count;
 
-  const char *size_grouped = with_thousand_seps (size);
+  const char *size_grouped = human_readable (size);
   int size_grouped_len = count_cols (size_grouped);
   /* Difference between num cols and num bytes: */
   int size_grouped_diff = strlen (size_grouped) - size_grouped_len;
   int size_grouped_pad; /* Used to pad the field width for size_grouped. */
 
+  const char *total_grouped = human_readable (bp->total_length);
+  int total_grouped_len = count_cols (total_grouped);
+  int total_grouped_diff = strlen (total_grouped) - total_grouped_len;
+  int total_grouped_pad;
+
   struct bar_progress_hist *hist = &bp->hist;
 
   /* The progress bar should look like this:
-     xx% [=======>             ] nn,nnn 12.34K/s  eta 36m 51s
+     xx% [=======>             ] 123K of 999K at 12.34K/s
 
      Calculate the geometry.  The idea is to assign as much room as
      possible to the progress bar.  The other idea is to never let
@@ -872,14 +880,18 @@ create_image (struct bar_progress *bp, double dl_total_time, bool done)
 
      "xx% " or "100%"  - percentage               - 4 chars
      "[]"              - progress bar decorations - 2 chars
-     " nnn,nnn,nnn"    - downloaded bytes         - 12 chars or very rarely more
+     " nnnnK"          - downloaded bytes         - 6 chars
+     " of"             - out of                   - 3 chars
+     " ssssK"          - total bytes              - 6 chars
+     " at"             - at the speed of          - 3 chars
      " 12.5K/s"        - download rate             - 8 chars
-     "  eta 36m 51s"   - ETA                      - 14 chars
+     " eta 12m 34s"    - ETA                      - 12 chars
 
      "=====>..."       - progress bar             - the rest
   */
-  int dlbytes_size = 1 + MAX (size_grouped_len, 11);
-  int progress_size = bp->width - (4 + 2 + dlbytes_size + 8 + 14);
+  int dlbytes_size = 1 + MAX (size_grouped_len, 5);
+  int ttlbytes_size = 1 + MAX (total_grouped_len, 5);
+  int progress_size = MIN (75, bp->width - (4 + 2 + dlbytes_size + 3 + ttlbytes_size + 3 + 8 + 12) );
 
   /* The difference between the number of bytes used,
      and the number of columns used. */
@@ -964,18 +976,34 @@ create_image (struct bar_progress *bp, double dl_total_time, bool done)
       ++bp->tick;
     }
 
-  /* " 234,567,890" */
-  sprintf (p, " %s", size_grouped);
-  move_to_end (p);
-  /* Pad with spaces to 11 chars for the size_grouped field;
+  /* " nnnnK" */
+  /* Pad with spaces to 5 chars for the size_grouped field;
    * couldn't use the field width specifier in sprintf, because
    * it counts in bytes, not characters. */
-  for (size_grouped_pad = 11 - size_grouped_len;
+  for (size_grouped_pad = 5 - size_grouped_len;
        size_grouped_pad > 0;
        --size_grouped_pad)
     {
       *p++ = ' ';
     }
+  sprintf (p, " %s", human_readable(size));
+  move_to_end (p);
+
+  strcpy (p, " of");
+  move_to_end (p);
+
+  /* " ssssK" */
+  for (total_grouped_pad = 5 - total_grouped_len;
+       total_grouped_pad > 0;
+       --total_grouped_pad)
+    {
+      *p++ = ' ';
+    }
+  sprintf (p, " %s", human_readable(bp->total_length));
+  move_to_end (p);
+
+  strcpy (p, " at");
+  move_to_end (p);
 
   /* " 12.52K/s" */
   if (hist->total_time > 0 && hist->total_bytes)
@@ -1034,7 +1062,7 @@ create_image (struct bar_progress *bp, double dl_total_time, bool done)
       else if (bp->total_length > 0)
         {
         skip_eta:
-          APPEND_LITERAL ("             ");
+          APPEND_LITERAL ("            ");
         }
     }
   else

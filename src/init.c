@@ -306,7 +306,7 @@ defaults (void)
   xzero (opt);
 
   opt.cookies = true;
-  opt.verbose = -1;
+  opt.verbose = 0;
   opt.ntry = 20;
   opt.reclevel = 5;
   opt.add_hostdir = true;

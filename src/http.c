@@ -1,6 +1,7 @@
 /* HTTP support.
-   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003,
-   2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
+   2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation,
+   Inc.
 
 This file is part of GNU Wget.
 
@@ -33,9 +34,7 @@ as that of the covered work.  */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifdef HAVE_UNISTD_H
-# include <unistd.h>
-#endif
+#include <unistd.h>
 #include <assert.h>
 #include <errno.h>
 #include <time.h>
@@ -56,9 +55,7 @@ as that of the covered work.  */
 # include "http-ntlm.h"
 #endif
 #include "cookies.h"
-#ifdef ENABLE_DIGEST
-# include "gen-md5.h"
-#endif
+#include "md5.h"
 #include "convert.h"
 #include "spider.h"
 
@@ -95,6 +92,7 @@ static struct cookie_jar *wget_cookie_jar;
 #define TEXTCSS_S "text/css"
 
 /* Some status code validation macros: */
+#define H_10X(x)        (((x) >= 100) && ((x) < 200))
 #define H_20X(x)        (((x) >= 200) && ((x) < 300))
 #define H_PARTIAL(x)    ((x) == HTTP_STATUS_PARTIAL_CONTENTS)
 #define H_REDIRECTED(x) ((x) == HTTP_STATUS_MOVED_PERMANENTLY          \
@@ -352,7 +350,7 @@ request_send (const struct request *req, int fd)
 
   APPEND (p, req->method); *p++ = ' ';
   APPEND (p, req->arg);    *p++ = ' ';
-  memcpy (p, "HTTP/1.0\r\n", 10); p += 10;
+  memcpy (p, "HTTP/1.1\r\n", 10); p += 10;
 
   for (i = 0; i < req->hcount; i++)
     {
@@ -406,18 +404,18 @@ maybe_send_basic_creds (const char *hostname, const char *user,
 
   if (opt.auth_without_challenge)
     {
-      DEBUGP(("Auth-without-challenge set, sending Basic credentials.\n"));
+      DEBUGP (("Auth-without-challenge set, sending Basic credentials.\n"));
       do_challenge = true;
     }
   else if (basic_authed_hosts
       && hash_table_contains(basic_authed_hosts, hostname))
     {
-      DEBUGP(("Found %s in basic_authed_hosts.\n", quote (hostname)));
+      DEBUGP (("Found %s in basic_authed_hosts.\n", quote (hostname)));
       do_challenge = true;
     }
   else
     {
-      DEBUGP(("Host %s has not issued a general basic challenge.\n",
+      DEBUGP (("Host %s has not issued a general basic challenge.\n",
               quote (hostname)));
     }
   if (do_challenge)
@@ -439,7 +437,7 @@ register_basic_auth_host (const char *hostname)
   if (!hash_table_contains(basic_authed_hosts, hostname))
     {
       hash_table_put (basic_authed_hosts, xstrdup(hostname), NULL);
-      DEBUGP(("Inserted %s into basic_authed_hosts\n", quote (hostname)));
+      DEBUGP (("Inserted %s into basic_authed_hosts\n", quote (hostname)));
     }
 }
 
@@ -901,29 +899,49 @@ parse_content_range (const char *hdr, wgint *first_byte_ptr,
    mode, the body is displayed for debugging purposes.  */
 
 static bool
-skip_short_body (int fd, wgint contlen)
+skip_short_body (int fd, wgint contlen, bool chunked)
 {
   enum {
     SKIP_SIZE = 512,                /* size of the download buffer */
     SKIP_THRESHOLD = 4096        /* the largest size we read */
   };
+  wgint remaining_chunk_size = 0;
   char dlbuf[SKIP_SIZE + 1];
   dlbuf[SKIP_SIZE] = '\0';        /* so DEBUGP can safely print it */
 
-  /* We shouldn't get here with unknown contlen.  (This will change
-     with HTTP/1.1, which supports "chunked" transfer.)  */
-  assert (contlen != -1);
+  assert (contlen != -1 || contlen);
 
   /* If the body is too large, it makes more sense to simply close the
      connection than to try to read the body.  */
   if (contlen > SKIP_THRESHOLD)
     return false;
 
-  DEBUGP (("Skipping %s bytes of body: [", number_to_static_string (contlen)));
-
-  while (contlen > 0)
+  while (contlen > 0 || chunked)
     {
-      int ret = fd_read (fd, dlbuf, MIN (contlen, SKIP_SIZE), -1);
+      int ret;
+      if (chunked)
+        {
+          if (remaining_chunk_size == 0)
+            {
+              char *line = fd_read_line (fd);
+              char *endl;
+              if (line == NULL)
+                break;
+
+              remaining_chunk_size = strtol (line, &endl, 16);
+              if (remaining_chunk_size == 0)
+                {
+                  fd_read_line (fd);
+                  break;
+                }
+            }
+
+          contlen = MIN (remaining_chunk_size, SKIP_SIZE);
+        }
+
+      DEBUGP (("Skipping %s bytes of body: [", number_to_static_string (contlen)));
+
+      ret = fd_read (fd, dlbuf, MIN (contlen, SKIP_SIZE), -1);
       if (ret <= 0)
         {
           /* Don't normally report the error since this is an
@@ -933,6 +951,15 @@ skip_short_body (int fd, wgint contlen)
           return false;
         }
       contlen -= ret;
+
+      if (chunked)
+        {
+          remaining_chunk_size -= ret;
+          if (remaining_chunk_size == 0)
+            if (fd_read_line (fd) == NULL)
+              return false;
+        }
+
       /* Safe even if %.*s bogusly expects terminating \0 because
          we've zero-terminated dlbuf above.  */
       DEBUGP (("%.*s", ret, dlbuf));
@@ -940,6 +967,66 @@ skip_short_body (int fd, wgint contlen)
 
   DEBUGP (("] done.\n"));
   return true;
+}
+
+#define NOT_RFC2231 0
+#define RFC2231_NOENCODING 1
+#define RFC2231_ENCODING 2
+
+/* extract_param extracts the parameter name into NAME.
+   However, if the parameter name is in RFC2231 format then
+   this function adjusts NAME by stripping of the trailing
+   characters that are not part of the name but are present to
+   indicate the presence of encoding information in the value
+   or a fragment of a long parameter value
+*/
+static int
+modify_param_name(param_token *name)
+{
+  const char *delim1 = memchr (name->b, '*', name->e - name->b);
+  const char *delim2 = memrchr (name->b, '*', name->e - name->b);
+
+  int result;
+
+  if(delim1 == NULL)
+    {
+      result = NOT_RFC2231;
+    }
+  else if(delim1 == delim2)
+    {
+      if ((name->e - 1) == delim1)
+	{
+	  result = RFC2231_ENCODING;
+	}
+      else
+	{
+	  result = RFC2231_NOENCODING;
+	}
+      name->e = delim1;
+    }
+  else
+    {
+      name->e = delim1;
+      result = RFC2231_ENCODING;
+    }
+  return result;
+}
+
+/* extract_param extract the paramater value into VALUE.
+   Like modify_param_name this function modifies VALUE by
+   stripping off the encoding information from the actual value
+*/
+static void
+modify_param_value (param_token *value, int encoding_type )
+{
+  if (RFC2231_ENCODING == encoding_type)
+    {
+      const char *delim = memrchr (value->b, '\'', value->e - value->b);
+      if ( delim != NULL )
+	{
+	  value->b = (delim+1);
+	}
+    }
 }
 
 /* Extract a parameter from the string (typically an HTTP header) at
@@ -1013,7 +1100,29 @@ extract_param (const char **source, param_token *name, param_token *value,
       if (*p == separator) ++p;
     }
   *source = p;
+
+  int param_type = modify_param_name(name);
+  if (NOT_RFC2231 != param_type)
+    {
+      modify_param_value(value, param_type);
+    }
   return true;
+}
+
+#undef NOT_RFC2231
+#undef RFC2231_NOENCODING
+#undef RFC2231_ENCODING
+
+/* Appends the string represented by VALUE to FILENAME */
+
+static void
+append_value_to_filename (char **filename, param_token const * const value)
+{
+  int original_length = strlen(*filename);
+  int new_length = strlen(*filename) + (value->e - value->b);
+  *filename = xrealloc (*filename, new_length+1);
+  memcpy (*filename + original_length, value->b, (value->e - value->b)); 
+  (*filename)[new_length] = '\0';
 }
 
 #undef MAX
@@ -1034,47 +1143,46 @@ extract_param (const char **source, param_token *name, param_token *value,
    false.
 
    The file name is stripped of directory components and must not be
-   empty.  */
+   empty.
 
+   Historically, this function returned filename prefixed with opt.dir_prefix,
+   now that logic is handled by the caller, new code should pay attention,
+   changed by crq, Sep 2010.
+
+*/
 static bool
 parse_content_disposition (const char *hdr, char **filename)
 {
   param_token name, value;
+  *filename = NULL;
   while (extract_param (&hdr, &name, &value, ';'))
-    if (BOUNDED_EQUAL_NO_CASE (name.b, name.e, "filename") && value.b != NULL)
-      {
-        /* Make the file name begin at the last slash or backslash. */
-        const char *last_slash = memrchr (value.b, '/', value.e - value.b);
-        const char *last_bs = memrchr (value.b, '\\', value.e - value.b);
-        if (last_slash && last_bs)
-          value.b = 1 + MAX (last_slash, last_bs);
-        else if (last_slash || last_bs)
-          value.b = 1 + (last_slash ? last_slash : last_bs);
-        if (value.b == value.e)
-          continue;
-        /* Start with the directory prefix, if specified. */
-        if (opt.dir_prefix)
-          {
-            int prefix_length = strlen (opt.dir_prefix);
-            bool add_slash = (opt.dir_prefix[prefix_length - 1] != '/');
-            int total_length;
+    {
+      int isFilename = BOUNDED_EQUAL_NO_CASE ( name.b, name.e, "filename" );
+      if ( isFilename && value.b != NULL)
+        {
+          /* Make the file name begin at the last slash or backslash. */
+          const char *last_slash = memrchr (value.b, '/', value.e - value.b);
+          const char *last_bs = memrchr (value.b, '\\', value.e - value.b);
+          if (last_slash && last_bs)
+            value.b = 1 + MAX (last_slash, last_bs);
+          else if (last_slash || last_bs)
+            value.b = 1 + (last_slash ? last_slash : last_bs);
+          if (value.b == value.e)
+            continue;
 
-            if (add_slash)
-              ++prefix_length;
-            total_length = prefix_length + (value.e - value.b);
-            *filename = xmalloc (total_length + 1);
-            strcpy (*filename, opt.dir_prefix);
-            if (add_slash)
-              (*filename)[prefix_length - 1] = '/';
-            memcpy (*filename + prefix_length, value.b, (value.e - value.b));
-            (*filename)[total_length] = '\0';
-          }
-        else
-          *filename = strdupdelim (value.b, value.e);
-        return true;
-      }
-  return false;
+          if (*filename)
+            append_value_to_filename (filename, &value);
+          else
+            *filename = strdupdelim (value.b, value.e);
+        }
+    }
+
+  if (*filename)
+    return true;
+  else
+    return false;
 }
+
 
 /* Persistent connections.  Currently, we cache the most recently used
    connection as persistent, provided that the HTTP server agrees to
@@ -1340,6 +1448,20 @@ free_hstat (struct http_stat *hs)
   hs->error = NULL;
 }
 
+static void
+get_file_flags (const char *filename, int *dt)
+{
+  logprintf (LOG_VERBOSE, _("\
+File %s already there; not retrieving.\n\n"), quote (filename));
+  /* If the file is there, we suppose it's retrieved OK.  */
+  *dt |= RETROKF;
+
+  /* #### Bogusness alert.  */
+  /* If its suffix is "html" or "htm" or similar, assume text/html.  */
+  if (has_html_suffix_p (filename))
+    *dt |= TEXTHTML;
+}
+
 #define BEGINS_WITH(line, string_constant)                               \
   (!strncasecmp (line, string_constant, sizeof (string_constant) - 1)    \
    && (c_isspace (line[sizeof (string_constant) - 1])                      \
@@ -1385,7 +1507,7 @@ free_hstat (struct http_stat *hs)
    server, and u->url will be requested.  */
 static uerr_t
 gethttp (struct url *u, struct http_stat *hs, int *dt, struct url *proxy,
-         struct iri *iri)
+         struct iri *iri, int count)
 {
   struct request *req;
 
@@ -1429,15 +1551,12 @@ gethttp (struct url *u, struct http_stat *hs, int *dt, struct url *proxy,
      is done. */
   bool keep_alive;
 
-  /* Whether keep-alive should be inhibited.
+  /* Is the server using the chunked transfer encoding?  */
+  bool chunked_transfer_encoding = false;
 
-     RFC 2068 requests that 1.0 clients not send keep-alive requests
-     to proxies.  This is because many 1.0 proxies do not interpret
-     the Connection header and transfer it to the remote server,
-     causing it to not close the connection and leave both the proxy
-     and the client hanging.  */
+  /* Whether keep-alive should be inhibited.  */
   bool inhibit_keep_alive =
-    !opt.http_keep_alive || opt.ignore_length || proxy != NULL;
+    !opt.http_keep_alive || opt.ignore_length;
 
   /* Headers sent when using POST. */
   wgint post_data_size = 0;
@@ -1500,7 +1619,13 @@ gethttp (struct url *u, struct http_stat *hs, int *dt, struct url *proxy,
 
   request_set_header (req, "Referer", (char *) hs->referer, rel_none);
   if (*dt & SEND_NOCACHE)
-    request_set_header (req, "Pragma", "no-cache", rel_none);
+    {
+      /* Cache-Control MUST be obeyed by all HTTP/1.1 caching mechanisms...  */
+      request_set_header (req, "Cache-Control", "no-cache, must-revalidate", rel_none);
+
+      /* ... but some HTTP/1.0 caches doesn't implement Cache-Control.  */
+      request_set_header (req, "Pragma", "no-cache", rel_none);
+    }
   if (hs->restval)
     request_set_header (req, "Range",
                         aprintf ("bytes=%s-",
@@ -1547,20 +1672,18 @@ gethttp (struct url *u, struct http_stat *hs, int *dt, struct url *proxy,
                         rel_value);
   }
 
-  if (!inhibit_keep_alive)
-    request_set_header (req, "Connection", "Keep-Alive", rel_none);
-
-  if (opt.cookies)
-    request_set_header (req, "Cookie",
-                        cookie_header (wget_cookie_jar,
-                                       u->host, u->port, u->path,
-#ifdef HAVE_SSL
-                                       u->scheme == SCHEME_HTTPS
-#else
-                                       0
-#endif
-                                       ),
-                        rel_value);
+  if (inhibit_keep_alive)
+    request_set_header (req, "Connection", "Close", rel_none);
+  else
+    {
+      if (proxy == NULL)
+        request_set_header (req, "Connection", "Keep-Alive", rel_none);
+      else
+        {
+          request_set_header (req, "Connection", "Close", rel_none);
+          request_set_header (req, "Proxy-Connection", "Keep-Alive", rel_none);
+        }
+    }
 
   if (opt.post_data || opt.post_file_name)
     {
@@ -1583,6 +1706,23 @@ gethttp (struct url *u, struct http_stat *hs, int *dt, struct url *proxy,
                           rel_value);
     }
 
+ retry_with_auth:
+  /* We need to come back here when the initial attempt to retrieve
+     without authorization header fails.  (Expected to happen at least
+     for the Digest authorization scheme.)  */
+
+  if (opt.cookies)
+    request_set_header (req, "Cookie",
+                        cookie_header (wget_cookie_jar,
+                                       u->host, u->port, u->path,
+#ifdef HAVE_SSL
+                                       u->scheme == SCHEME_HTTPS
+#else
+                                       0
+#endif
+                                       ),
+                        rel_value);
+
   /* Add the user headers. */
   if (opt.user_headers)
     {
@@ -1590,11 +1730,6 @@ gethttp (struct url *u, struct http_stat *hs, int *dt, struct url *proxy,
       for (i = 0; opt.user_headers[i]; i++)
         request_set_user_header (req, opt.user_headers[i]);
     }
-
- retry_with_auth:
-  /* We need to come back here when the initial attempt to retrieve
-     without authorization header fails.  (Expected to happen at least
-     for the Digest authorization scheme.)  */
 
   proxyauth = NULL;
   if (proxy)
@@ -1631,11 +1766,13 @@ gethttp (struct url *u, struct http_stat *hs, int *dt, struct url *proxy,
         request_set_header (req, "Proxy-Authorization", proxyauth, rel_value);
     }
 
-  keep_alive = false;
+  keep_alive = true;
 
   /* Establish the connection.  */
 
-  if (!inhibit_keep_alive)
+  if (inhibit_keep_alive)
+    keep_alive = false;
+  else
     {
       /* Look for a persistent connection to target host, unless a
          proxy is used.  The exception is when SSL is in use, in which
@@ -1741,6 +1878,16 @@ gethttp (struct url *u, struct http_stat *hs, int *dt, struct url *proxy,
 
           resp = resp_new (head);
           statcode = resp_status (resp, &message);
+          if (statcode < 0)
+            {
+              char *tms = datetime_str (time (NULL));
+              logprintf (LOG_VERBOSE, "%d\n", statcode);
+              logprintf (LOG_NOTQUIET, _("%s ERROR %d: %s.\n"), tms, statcode,
+                         quotearg_style (escape_quoting_style,
+                                         _("Malformed status line")));
+              xfree (head);
+              return HERR;
+            }
           hs->message = xstrdup (message);
           resp_free (resp);
           xfree (head);
@@ -1803,6 +1950,7 @@ gethttp (struct url *u, struct http_stat *hs, int *dt, struct url *proxy,
   contrange = 0;
   *dt &= ~RETROKF;
 
+read_header:
   head = read_http_response_head (sock);
   if (!head)
     {
@@ -1829,6 +1977,26 @@ gethttp (struct url *u, struct http_stat *hs, int *dt, struct url *proxy,
   /* Check for status line.  */
   message = NULL;
   statcode = resp_status (resp, &message);
+  if (statcode < 0)
+    {
+      char *tms = datetime_str (time (NULL));
+      logprintf (LOG_VERBOSE, "%d\n", statcode);
+      logprintf (LOG_NOTQUIET, _("%s ERROR %d: %s.\n"), tms, statcode,
+                 quotearg_style (escape_quoting_style,
+                                 _("Malformed status line")));
+      CLOSE_INVALIDATE (sock);
+      request_free (req);
+      xfree (head);
+      return HERR;
+    }
+
+  if (H_10X (statcode))
+    {
+      DEBUGP (("Ignoring response\n"));
+      xfree (head);
+      goto read_header;
+    }
+
   hs->message = xstrdup (message);
   if (!opt.server_response)
     logprintf (LOG_VERBOSE, "%2d %s\n", statcode,
@@ -1867,14 +2035,17 @@ gethttp (struct url *u, struct http_stat *hs, int *dt, struct url *proxy,
   /* Check for keep-alive related responses. */
   if (!inhibit_keep_alive && contlen != -1)
     {
-      if (resp_header_copy (resp, "Keep-Alive", NULL, 0))
-        keep_alive = true;
-      else if (resp_header_copy (resp, "Connection", hdrval, sizeof (hdrval)))
+      if (resp_header_copy (resp, "Connection", hdrval, sizeof (hdrval)))
         {
-          if (0 == strcasecmp (hdrval, "Keep-Alive"))
-            keep_alive = true;
+          if (0 == strcasecmp (hdrval, "Close"))
+            keep_alive = false;
         }
     }
+
+  chunked_transfer_encoding = false;
+  if (resp_header_copy (resp, "Transfer-Encoding", hdrval, sizeof (hdrval))
+      && 0 == strcasecmp (hdrval, "chunked"))
+    chunked_transfer_encoding = true;
 
   /* Handle (possibly multiple instances of) the Set-Cookie header. */
   if (opt.cookies)
@@ -1902,7 +2073,8 @@ gethttp (struct url *u, struct http_stat *hs, int *dt, struct url *proxy,
   if (statcode == HTTP_STATUS_UNAUTHORIZED)
     {
       /* Authorization is required.  */
-      if (keep_alive && !head_only && skip_short_body (sock, contlen))
+      if (keep_alive && !head_only
+          && skip_short_body (sock, contlen, chunked_transfer_encoding))
         CLOSE_FINISH (sock);
       else
         CLOSE_INVALIDATE (sock);
@@ -1981,15 +2153,23 @@ gethttp (struct url *u, struct http_stat *hs, int *dt, struct url *proxy,
    * hstat.local_file is set by http_loop to the argument of -O. */
   if (!hs->local_file)
     {
+      char *local_file = NULL;
+
       /* Honor Content-Disposition whether possible. */
       if (!opt.content_disposition
           || !resp_header_copy (resp, "Content-Disposition",
                                 hdrval, sizeof (hdrval))
-          || !parse_content_disposition (hdrval, &hs->local_file))
+          || !parse_content_disposition (hdrval, &local_file))
         {
           /* The Content-Disposition header is missing or broken.
            * Choose unique file name according to given URL. */
-          hs->local_file = url_file_name (u);
+          hs->local_file = url_file_name (u, NULL);
+        }
+      else
+        {
+          DEBUGP (("Parsed filename from Content-Disposition: %s\n",
+                  local_file));
+          hs->local_file = url_file_name (u, local_file);
         }
     }
 
@@ -2001,16 +2181,7 @@ gethttp (struct url *u, struct http_stat *hs, int *dt, struct url *proxy,
           /* If opt.noclobber is turned on and file already exists, do not
              retrieve the file. But if the output_document was given, then this
              test was already done and the file didn't exist. Hence the !opt.output_document */
-          logprintf (LOG_VERBOSE, _("\
-File %s already there; not retrieving.\n\n"), quote (hs->local_file));
-          /* If the file is there, we suppose it's retrieved OK.  */
-          *dt |= RETROKF;
-
-          /* #### Bogusness alert.  */
-          /* If its suffix is "html" or "htm" or similar, assume text/html.  */
-          if (has_html_suffix_p (hs->local_file))
-            *dt |= TEXTHTML;
-
+          get_file_flags (hs->local_file, dt);
           xfree (head);
           xfree_null (message);
           return RETRUNNEEDED;
@@ -2154,12 +2325,22 @@ File %s already there; not retrieving.\n\n"), quote (hs->local_file));
                      _("Location: %s%s\n"),
                      hs->newloc ? escnonprint_uri (hs->newloc) : _("unspecified"),
                      hs->newloc ? _(" [following]") : "");
-          if (keep_alive && !head_only && skip_short_body (sock, contlen))
+          if (keep_alive && !head_only
+              && skip_short_body (sock, contlen, chunked_transfer_encoding))
             CLOSE_FINISH (sock);
           else
             CLOSE_INVALIDATE (sock);
           xfree_null (type);
           xfree (head);
+          /* From RFC2616: The status codes 303 and 307 have
+             been added for servers that wish to make unambiguously
+             clear which kind of reaction is expected of the client.
+             
+             A 307 should be redirected using the same method,
+             in other words, a POST should be preserved and not
+             converted to a GET in that case. */
+          if (statcode == HTTP_STATUS_TEMPORARY_REDIRECT)
+            return NEWLOCATION_KEEP_POST;
           return NEWLOCATION;
         }
     }
@@ -2197,9 +2378,8 @@ File %s already there; not retrieving.\n\n"), quote (hs->local_file));
     }
 
   if (statcode == HTTP_STATUS_RANGE_NOT_SATISFIABLE
-      || (hs->restval > 0 && statcode == HTTP_STATUS_OK
-          && contrange == 0 && hs->restval >= contlen)
-     )
+      || (!opt.timestamping && hs->restval > 0 && statcode == HTTP_STATUS_OK
+          && contrange == 0 && contlen >= 0 && hs->restval >= contlen))
     {
       /* If `-c' is in use and the file has been fully downloaded (or
          the remote file has shrunk), Wget effectively requests bytes
@@ -2284,7 +2464,8 @@ File %s already there; not retrieving.\n\n"), quote (hs->local_file));
            If not, they can be worked around using
            `--no-http-keep-alive'.  */
         CLOSE_FINISH (sock);
-      else if (keep_alive && skip_short_body (sock, contlen))
+      else if (keep_alive
+               && skip_short_body (sock, contlen, chunked_transfer_encoding))
         /* Successfully skipped the body; also keep using the socket. */
         CLOSE_FINISH (sock);
       else
@@ -2320,8 +2501,21 @@ File %s already there; not retrieving.\n\n"), quote (hs->local_file));
           fp = fopen (hs->local_file, "ab");
 #endif /* def __VMS [else] */
         }
-      else if (ALLOW_CLOBBER)
+      else if (ALLOW_CLOBBER || count > 0)
         {
+	  if (opt.unlink && file_exists_p (hs->local_file))
+	    {
+	      int res = unlink (hs->local_file);
+	      if (res < 0)
+		{
+		  logprintf (LOG_NOTQUIET, "%s: %s\n", hs->local_file,
+			     strerror (errno));
+		  CLOSE_INVALIDATE (sock);
+		  xfree (head);
+		  return UNLINKERR;
+		}
+	    }
+
 #ifdef __VMS
           int open_id;
 
@@ -2385,6 +2579,10 @@ File %s already there; not retrieving.\n\n"), quote (hs->local_file));
     /* If the server ignored our range request, instruct fd_read_body
        to skip the first RESTVAL bytes of body.  */
     flags |= rb_skip_startpos;
+
+  if (chunked_transfer_encoding)
+    flags |= rb_chunked_transfer_encoding;
+
   hs->len = hs->restval;
   hs->rd_size = 0;
   hs->res = fd_read_body (sock, fp, contlen != -1 ? contlen : 0,
@@ -2410,8 +2608,9 @@ File %s already there; not retrieving.\n\n"), quote (hs->local_file));
 /* The genuine HTTP loop!  This is the part where the retrieval is
    retried, and retried, and retried, and...  */
 uerr_t
-http_loop (struct url *u, char **newloc, char **local_file, const char *referer,
-           int *dt, struct url *proxy, struct iri *iri)
+http_loop (struct url *u, struct url *original_url, char **newloc,
+           char **local_file, const char *referer, int *dt, struct url *proxy,
+           struct iri *iri)
 {
   int count;
   bool got_head = false;         /* used for time-stamping and filename detection */
@@ -2425,6 +2624,7 @@ http_loop (struct url *u, char **newloc, char **local_file, const char *referer,
   struct_stat st;
   bool send_head_first = true;
   char *file_name;
+  bool force_full_retrieve = false;
 
   /* Assert that no value for *LOCAL_FILE was passed. */
   assert (local_file == NULL || *local_file == NULL);
@@ -2440,7 +2640,7 @@ http_loop (struct url *u, char **newloc, char **local_file, const char *referer,
      here so that we don't go through the hoops if we're just using
      FTP or whatever. */
   if (opt.cookies)
-    load_cookies();
+    load_cookies ();
 
   /* Warn on (likely bogus) wildcard usage in HTTP. */
   if (opt.ftp_glob && has_wildcards_p (u->path))
@@ -2457,28 +2657,17 @@ http_loop (struct url *u, char **newloc, char **local_file, const char *referer,
     }
   else if (!opt.content_disposition)
     {
-      hstat.local_file = url_file_name (u);
+      hstat.local_file =
+        url_file_name (opt.trustservernames ? u : original_url, NULL);
       got_name = true;
     }
 
-  /* TODO: Ick! This code is now in both gethttp and http_loop, and is
-   * screaming for some refactoring. */
   if (got_name && file_exists_p (hstat.local_file) && opt.noclobber && !opt.output_document)
     {
       /* If opt.noclobber is turned on and file already exists, do not
          retrieve the file. But if the output_document was given, then this
          test was already done and the file didn't exist. Hence the !opt.output_document */
-      logprintf (LOG_VERBOSE, _("\
-File %s already there; not retrieving.\n\n"),
-                 quote (hstat.local_file));
-      /* If the file is there, we suppose it's retrieved OK.  */
-      *dt |= RETROKF;
-
-      /* #### Bogusness alert.  */
-      /* If its suffix is "html" or "htm" or similar, assume text/html.  */
-      if (has_html_suffix_p (hstat.local_file))
-        *dt |= TEXTHTML;
-
+      get_file_flags (hstat.local_file, dt);
       ret = RETROK;
       goto exit;
     }
@@ -2489,18 +2678,15 @@ File %s already there; not retrieving.\n\n"),
   /* Reset the document type. */
   *dt = 0;
 
-  /* Skip preliminary HEAD request if we're not in spider mode AND
-   * if -O was given or HTTP Content-Disposition support is disabled. */
-  if (!opt.spider
-      && (got_name || !opt.content_disposition))
+  /* Skip preliminary HEAD request if we're not in spider mode.  */
+  if (!opt.spider)
     send_head_first = false;
 
   /* Send preliminary HEAD request if -N is given and we have an existing
    * destination file. */
-  file_name = url_file_name (u);
-  if (opt.timestamping
-      && !opt.content_disposition
-      && file_exists_p (file_name))
+  file_name = url_file_name (opt.trustservernames ? u : original_url, NULL);
+  if (opt.timestamping && (file_exists_p (file_name)
+                           || opt.content_disposition))
     send_head_first = true;
   xfree (file_name);
 
@@ -2551,7 +2737,9 @@ Spider mode enabled. Check if remote file exists.\n"));
         *dt &= ~HEAD_ONLY;
 
       /* Decide whether or not to restart.  */
-      if (opt.always_rest
+      if (force_full_retrieve)
+        hstat.restval = hstat.len;
+      else if (opt.always_rest
           && got_name
           && stat (hstat.local_file, &st) == 0
           && S_ISREG (st.st_mode))
@@ -2578,7 +2766,7 @@ Spider mode enabled. Check if remote file exists.\n"));
         *dt &= ~SEND_NOCACHE;
 
       /* Try fetching the document, or at least its head.  */
-      err = gethttp (u, &hstat, dt, proxy, iri);
+      err = gethttp (u, &hstat, dt, proxy, iri, count);
 
       /* Time?  */
       tms = datetime_str (time (NULL));
@@ -2612,7 +2800,15 @@ Spider mode enabled. Check if remote file exists.\n"));
           logprintf (LOG_NOTQUIET, _("Unable to establish SSL connection.\n"));
           ret = err;
           goto exit;
+        case UNLINKERR:
+          /* Another fatal error.  */
+          logputs (LOG_VERBOSE, "\n");
+          logprintf (LOG_NOTQUIET, _("Cannot unlink %s (%s).\n"),
+                     quote (hstat.local_file), strerror (errno));
+          ret = err;
+          goto exit;
         case NEWLOCATION:
+        case NEWLOCATION_KEEP_POST:
           /* Return the new location to the caller.  */
           if (!*newloc)
             {
@@ -2623,7 +2819,7 @@ Spider mode enabled. Check if remote file exists.\n"));
             }
           else
             {
-              ret = NEWLOCATION;
+              ret = err;
             }
           goto exit;
         case RETRUNNEEDED:
@@ -2739,8 +2935,11 @@ The sizes do not match (local %s) -- retrieving.\n"),
                                 }
                             }
                           else
-                            logputs (LOG_VERBOSE,
-                                     _("Remote file is newer, retrieving.\n"));
+                            {
+                              force_full_retrieve = true;
+                              logputs (LOG_VERBOSE,
+                                       _("Remote file is newer, retrieving.\n"));
+                            }
 
                           logputs (LOG_VERBOSE, "\n");
                         }
@@ -2801,7 +3000,8 @@ Remote file exists.\n\n"));
             } /* send_head_first */
         } /* !got_head */
 
-      if ((tmr != (time_t) (-1))
+      if (opt.useservertimestamps
+          && (tmr != (time_t) (-1))
           && ((hstat.len == hstat.contlen) ||
               ((hstat.res == 0) && (hstat.contlen == -1))))
         {
@@ -2848,13 +3048,13 @@ Remote file exists.\n\n"));
                          hstat.local_file, count);
             }
           ++numurls;
-          total_downloaded_bytes += hstat.len;
+          total_downloaded_bytes += hstat.rd_size;
 
           /* Remember that we downloaded the file for later ".orig" code. */
           if (*dt & ADDED_HTML_EXTENSION)
-            downloaded_file(FILE_DOWNLOADED_AND_HTML_EXTENSION_ADDED, hstat.local_file);
+            downloaded_file (FILE_DOWNLOADED_AND_HTML_EXTENSION_ADDED, hstat.local_file);
           else
-            downloaded_file(FILE_DOWNLOADED_NORMALLY, hstat.local_file);
+            downloaded_file (FILE_DOWNLOADED_NORMALLY, hstat.local_file);
 
           ret = RETROK;
           goto exit;
@@ -2881,13 +3081,13 @@ Remote file exists.\n\n"));
                              hstat.local_file, count);
                 }
               ++numurls;
-              total_downloaded_bytes += hstat.len;
+              total_downloaded_bytes += hstat.rd_size;
 
               /* Remember that we downloaded the file for later ".orig" code. */
               if (*dt & ADDED_HTML_EXTENSION)
-                downloaded_file(FILE_DOWNLOADED_AND_HTML_EXTENSION_ADDED, hstat.local_file);
+                downloaded_file (FILE_DOWNLOADED_AND_HTML_EXTENSION_ADDED, hstat.local_file);
               else
-                downloaded_file(FILE_DOWNLOADED_NORMALLY, hstat.local_file);
+                downloaded_file (FILE_DOWNLOADED_NORMALLY, hstat.local_file);
 
               ret = RETROK;
               goto exit;
@@ -2942,7 +3142,7 @@ Remote file exists.\n\n"));
   while (!opt.ntry || (count < opt.ntry));
 
 exit:
-  if (ret == RETROK)
+  if (ret == RETROK && local_file)
     *local_file = xstrdup (hstat.local_file);
   free_hstat (&hstat);
 
@@ -3027,7 +3227,7 @@ http_atotm (const char *time_string)
   oldlocale = setlocale (LC_TIME, NULL);
   if (oldlocale)
     {
-      size_t l = strlen (oldlocale);
+      size_t l = strlen (oldlocale) + 1;
       if (l >= sizeof savedlocale)
         savedlocale[0] = '\0';
       else
@@ -3108,7 +3308,7 @@ dump_hash (char *buf, const unsigned char *hash)
 {
   int i;
 
-  for (i = 0; i < MD5_HASHLEN; i++, hash++)
+  for (i = 0; i < MD5_DIGEST_SIZE; i++, hash++)
     {
       *buf++ = XNUM_TO_digit (*hash >> 4);
       *buf++ = XNUM_TO_digit (*hash & 0xf);
@@ -3161,37 +3361,37 @@ digest_authentication_encode (const char *au, const char *user,
 
   /* Calculate the digest value.  */
   {
-    ALLOCA_MD5_CONTEXT (ctx);
-    unsigned char hash[MD5_HASHLEN];
-    char a1buf[MD5_HASHLEN * 2 + 1], a2buf[MD5_HASHLEN * 2 + 1];
-    char response_digest[MD5_HASHLEN * 2 + 1];
+    struct md5_ctx ctx;
+    unsigned char hash[MD5_DIGEST_SIZE];
+    char a1buf[MD5_DIGEST_SIZE * 2 + 1], a2buf[MD5_DIGEST_SIZE * 2 + 1];
+    char response_digest[MD5_DIGEST_SIZE * 2 + 1];
 
     /* A1BUF = H(user ":" realm ":" password) */
-    gen_md5_init (ctx);
-    gen_md5_update ((unsigned char *)user, strlen (user), ctx);
-    gen_md5_update ((unsigned char *)":", 1, ctx);
-    gen_md5_update ((unsigned char *)realm, strlen (realm), ctx);
-    gen_md5_update ((unsigned char *)":", 1, ctx);
-    gen_md5_update ((unsigned char *)passwd, strlen (passwd), ctx);
-    gen_md5_finish (ctx, hash);
+    md5_init_ctx (&ctx);
+    md5_process_bytes ((unsigned char *)user, strlen (user), &ctx);
+    md5_process_bytes ((unsigned char *)":", 1, &ctx);
+    md5_process_bytes ((unsigned char *)realm, strlen (realm), &ctx);
+    md5_process_bytes ((unsigned char *)":", 1, &ctx);
+    md5_process_bytes ((unsigned char *)passwd, strlen (passwd), &ctx);
+    md5_finish_ctx (&ctx, hash);
     dump_hash (a1buf, hash);
 
     /* A2BUF = H(method ":" path) */
-    gen_md5_init (ctx);
-    gen_md5_update ((unsigned char *)method, strlen (method), ctx);
-    gen_md5_update ((unsigned char *)":", 1, ctx);
-    gen_md5_update ((unsigned char *)path, strlen (path), ctx);
-    gen_md5_finish (ctx, hash);
+    md5_init_ctx (&ctx);
+    md5_process_bytes ((unsigned char *)method, strlen (method), &ctx);
+    md5_process_bytes ((unsigned char *)":", 1, &ctx);
+    md5_process_bytes ((unsigned char *)path, strlen (path), &ctx);
+    md5_finish_ctx (&ctx, hash);
     dump_hash (a2buf, hash);
 
     /* RESPONSE_DIGEST = H(A1BUF ":" nonce ":" A2BUF) */
-    gen_md5_init (ctx);
-    gen_md5_update ((unsigned char *)a1buf, MD5_HASHLEN * 2, ctx);
-    gen_md5_update ((unsigned char *)":", 1, ctx);
-    gen_md5_update ((unsigned char *)nonce, strlen (nonce), ctx);
-    gen_md5_update ((unsigned char *)":", 1, ctx);
-    gen_md5_update ((unsigned char *)a2buf, MD5_HASHLEN * 2, ctx);
-    gen_md5_finish (ctx, hash);
+    md5_init_ctx (&ctx);
+    md5_process_bytes ((unsigned char *)a1buf, MD5_DIGEST_SIZE * 2, &ctx);
+    md5_process_bytes ((unsigned char *)":", 1, &ctx);
+    md5_process_bytes ((unsigned char *)nonce, strlen (nonce), &ctx);
+    md5_process_bytes ((unsigned char *)":", 1, &ctx);
+    md5_process_bytes ((unsigned char *)a2buf, MD5_DIGEST_SIZE * 2, &ctx);
+    md5_finish_ctx (&ctx, hash);
     dump_hash (response_digest, hash);
 
     res = xmalloc (strlen (user)
@@ -3199,7 +3399,7 @@ digest_authentication_encode (const char *au, const char *user,
                    + strlen (realm)
                    + strlen (nonce)
                    + strlen (path)
-                   + 2 * MD5_HASHLEN /*strlen (response_digest)*/
+                   + 2 * MD5_DIGEST_SIZE /*strlen (response_digest)*/
                    + (opaque ? strlen (opaque) : 0)
                    + 128);
     sprintf (res, "Digest \
@@ -3320,7 +3520,7 @@ ensure_extension (struct http_stat *hs, const char *ext, int *dt)
   if (len == 5)
     {
       strncpy (shortext, ext, len - 1);
-      shortext[len - 2] = '\0';
+      shortext[len - 1] = '\0';
     }
 
   if (last_period_in_local_filename == NULL
@@ -3356,18 +3556,15 @@ test_parse_content_disposition()
   int i;
   struct {
     char *hdrval;
-    char *opt_dir_prefix;
     char *filename;
     bool result;
   } test_array[] = {
-    { "filename=\"file.ext\"", NULL, "file.ext", true },
-    { "filename=\"file.ext\"", "somedir", "somedir/file.ext", true },
-    { "attachment; filename=\"file.ext\"", NULL, "file.ext", true },
-    { "attachment; filename=\"file.ext\"", "somedir", "somedir/file.ext", true },
-    { "attachment; filename=\"file.ext\"; dummy", NULL, "file.ext", true },
-    { "attachment; filename=\"file.ext\"; dummy", "somedir", "somedir/file.ext", true },
-    { "attachment", NULL, NULL, false },
-    { "attachment", "somedir", NULL, false },
+    { "filename=\"file.ext\"", "file.ext", true },
+    { "attachment; filename=\"file.ext\"", "file.ext", true },
+    { "attachment; filename=\"file.ext\"; dummy", "file.ext", true },
+    { "attachment", NULL, false },
+    { "attachement; filename*=UTF-8'en-US'hello.txt", "hello.txt", true },
+    { "attachement; filename*0=\"hello\"; filename*1=\"world.txt\"", "helloworld.txt", true },
   };
 
   for (i = 0; i < sizeof(test_array)/sizeof(test_array[0]); ++i)
@@ -3375,7 +3572,6 @@ test_parse_content_disposition()
       char *filename;
       bool res;
 
-      opt.dir_prefix = test_array[i].opt_dir_prefix;
       res = parse_content_disposition (test_array[i].hdrval, &filename);
 
       mu_assert ("test_parse_content_disposition: wrong result",

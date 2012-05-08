@@ -1,6 +1,7 @@
 /* Reading/parsing the initialization file.
-   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003,
-   2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
+   2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation,
+   Inc.
 
 This file is part of GNU Wget.
 
@@ -32,11 +33,19 @@ as that of the covered work.  */
 
 #include <stdio.h>
 #include <stdlib.h>
-#ifdef HAVE_UNISTD_H
-# include <unistd.h>
-#endif
+#include <stdbool.h>
+#include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <limits.h>
+/* not all systems provide PATH_MAX in limits.h */
+#ifndef PATH_MAX
+# include <sys/param.h>
+# ifndef PATH_MAX
+#  define PATH_MAX MAXPATHLEN
+# endif
+#endif
+
 
 #ifdef HAVE_PWD_H
 # include <pwd.h>
@@ -127,6 +136,7 @@ static const struct {
   { "certificatetype",  &opt.cert_type,         cmd_cert_type },
   { "checkcertificate", &opt.check_cert,        cmd_boolean },
 #endif
+  { "chooseconfig",     &opt.choose_config,	cmd_file },
   { "connecttimeout",   &opt.connect_timeout,   cmd_time },
   { "contentdisposition", &opt.content_disposition, cmd_boolean },
   { "continue",         &opt.always_rest,       cmd_boolean },
@@ -237,15 +247,19 @@ static const struct {
   { "secureprotocol",   &opt.secure_protocol,   cmd_spec_secure_protocol },
 #endif
   { "serverresponse",   &opt.server_response,   cmd_boolean },
+  { "showalldnsentries", &opt.show_all_dns_entries, cmd_boolean },
   { "spanhosts",        &opt.spanhost,          cmd_boolean },
   { "spider",           &opt.spider,            cmd_boolean },
   { "strictcomments",   &opt.strict_comments,   cmd_boolean },
   { "timeout",          NULL,                   cmd_spec_timeout },
   { "timestamping",     &opt.timestamping,      cmd_boolean },
   { "tries",            &opt.ntry,              cmd_number_inf },
+  { "trustservernames", &opt.trustservernames,  cmd_boolean },
+  { "unlink",           &opt.unlink,            cmd_boolean },
   { "useproxy",         &opt.use_proxy,         cmd_boolean },
   { "user",             &opt.user,              cmd_string },
   { "useragent",        NULL,                   cmd_spec_useragent },
+  { "useservertimestamps", &opt.useservertimestamps, cmd_boolean },
   { "verbose",          NULL,                   cmd_spec_verbose },
   { "wait",             &opt.wait,              cmd_time },
   { "waitretry",        &opt.waitretry,         cmd_time },
@@ -279,7 +293,7 @@ command_by_name (const char *cmdname)
 }
 
 /* Reset the variables to default values.  */
-static void
+void
 defaults (void)
 {
   char *tmp;
@@ -344,6 +358,9 @@ defaults (void)
 #endif
   opt.locale = NULL;
   opt.encoding_remote = NULL;
+
+  opt.useservertimestamps = true;
+  opt.show_all_dns_entries = false;
 }
 
 /* Return the user's home directory (strdup-ed), or NULL if none is
@@ -351,8 +368,8 @@ defaults (void)
 char *
 home_dir (void)
 {
-  static char buf[PATH_MAX];
-  static char *home;
+  static char *buf = NULL;
+  static char *home, *ret;
 
   if (!home)
     {
@@ -360,17 +377,28 @@ home_dir (void)
       if (!home)
         {
 #if defined(MSDOS)
+          int len;
+
           /* Under MSDOS, if $HOME isn't defined, use the directory where
              `wget.exe' resides.  */
           const char *_w32_get_argv0 (void); /* in libwatt.a/pcconfig.c */
           char *p;
 
-          strcpy (buf, _w32_get_argv0 ());
+          buff = _w32_get_argv0 ();
+
           p = strrchr (buf, '/');            /* djgpp */
           if (!p)
             p = strrchr (buf, '\\');          /* others */
           assert (p);
-          *p = '\0';
+
+          len = p - buff + 1;
+          buff = malloc (len + 1);
+          if (buff == NULL)
+            return NULL;
+
+          strncpy (buff, _w32_get_argv0 (), len);
+          buff[len] = '\0';
+
           home = buf;
 #elif !defined(WINDOWS)
           /* If HOME is not defined, try getting it from the password
@@ -378,8 +406,7 @@ home_dir (void)
           struct passwd *pwd = getpwuid (getuid ());
           if (!pwd || !pwd->pw_dir)
             return NULL;
-          strcpy (buf, pwd->pw_dir);
-          home = buf;
+          home = pwd->pw_dir;
 #else  /* !WINDOWS */
           /* Under Windows, if $HOME isn't defined, use the directory where
              `wget.exe' resides.  */
@@ -388,7 +415,11 @@ home_dir (void)
         }
     }
 
-  return home ? xstrdup (home) : NULL;
+  ret = home ? xstrdup (home) : NULL;
+  if (buf)
+    free (buf);
+
+  return ret;
 }
 
 /* Check the 'WGETRC' environment variable and return the file name
@@ -417,7 +448,7 @@ wgetrc_env_file_name (void)
 char *
 wgetrc_user_file_name (void)
 {
-  char *home = home_dir ();
+  char *home;
   char *file = NULL;
   /* If that failed, try $HOME/.wgetrc (or equivalent).  */
 
@@ -496,7 +527,7 @@ static bool setval_internal_tilde (int, const char *, const char *);
 /* Initialize variables from a wgetrc file.  Returns zero (failure) if
    there were errors in the file.  */
 
-static bool
+bool
 run_wgetrc (const char *file)
 {
   FILE *fp;
@@ -560,10 +591,7 @@ void
 initialize (void)
 {
   char *file, *env_sysrc;
-  int ok = true;
-
-  /* Load the hard-coded defaults.  */
-  defaults ();
+  bool ok = true;
 
   /* Run a non-standard system rc file when the according environment
      variable has been set. For internal testing purposes only!  */
@@ -575,6 +603,15 @@ initialize (void)
   else if (file_exists_p (SYSTEM_WGETRC))
     ok &= run_wgetrc (SYSTEM_WGETRC);
 #endif
+  /* If there are any problems parsing the system wgetrc file, tell
+     the user and exit */
+  if (! ok)
+    {
+      fprintf (stderr, _("\
+Parsing system wgetrc file failed, please check '%s'.           \
+Or specify a different file using --config\n"), SYSTEM_WGETRC);
+      exit (2);
+    }
   /* Override it with your own, if one exists.  */
   file = wgetrc_file_name ();
   if (!file)
@@ -1564,6 +1601,7 @@ cleanup (void)
     extern acc_t *netrc_list;
     free_netrc (netrc_list);
   }
+  xfree_null (opt.choose_config);
   xfree_null (opt.lfilename);
   xfree_null (opt.dir_prefix);
   xfree_null (opt.input_filename);

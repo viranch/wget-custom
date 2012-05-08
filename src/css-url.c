@@ -1,6 +1,6 @@
 /* Collect URLs from CSS source.
-   Copyright (C) 1998, 2000, 2001, 2002, 2003, 2009 Free Software
-   Foundation, Inc.
+   Copyright (C) 1998, 2000, 2001, 2002, 2003, 2009, 2010, 2011 Free
+   Software Foundation, Inc.
 
 This file is part of GNU Wget.
 
@@ -124,9 +124,11 @@ get_uri_string (const char *at, int *pos, int *length)
   /* skip leading space */
   while (isspace (at[*pos]))
     {
-    (*pos)++;
-    (*length)--;
+      (*pos)++;
+      if (--(*length) == 0)
+        return NULL;
     }
+
   /* skip trailing space */
   while (isspace (at[*pos + *length - 1]))
     {
@@ -252,7 +254,7 @@ get_urls_css_file (const char *file, const char *url)
   struct map_context ctx;
 
   /* Load the file. */
-  fm = read_file (file);
+  fm = wget_read_file (file);
   if (!fm)
     {
       logprintf (LOG_NOTQUIET, "%s: %s\n", file, strerror (errno));
@@ -261,13 +263,13 @@ get_urls_css_file (const char *file, const char *url)
   DEBUGP (("Loaded %s (size %s).\n", file, number_to_static_string (fm->length)));
 
   ctx.text = fm->content;
-  ctx.head = ctx.tail = NULL;
+  ctx.head = NULL;
   ctx.base = NULL;
   ctx.parent_base = url ? url : opt.base_href;
   ctx.document_file = file;
   ctx.nofollow = 0;
 
   get_urls_css (&ctx, 0, fm->length);
-  read_file_free (fm);
+  wget_read_file_free (fm);
   return ctx.head;
 }

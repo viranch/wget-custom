@@ -1,6 +1,7 @@
 /* Declarations for utils.c.
    Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
-   2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation,
+   Inc.
 
 This file is part of GNU Wget.
 
@@ -97,8 +98,8 @@ bool has_wildcards_p (const char *);
 bool has_html_suffix_p (const char *);
 
 char *read_whole_line (FILE *);
-struct file_memory *read_file (const char *);
-void read_file_free (struct file_memory *);
+struct file_memory *wget_read_file (const char *);
+void wget_read_file_free (struct file_memory *);
 
 void free_vec (char **);
 char **merge_vecs (char **, char **);

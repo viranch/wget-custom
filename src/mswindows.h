@@ -1,6 +1,7 @@
 /* Declarations for windows
    Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
-   2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation,
+   Inc.
 
 This file is part of GNU Wget.
 
@@ -42,15 +43,8 @@ as that of the covered work.  */
 
 #include <windows.h>
 
-/* We need winsock2.h for IPv6 and ws2tcpip.h for getaddrinfo, so
-  include both in ENABLE_IPV6 case.  (ws2tcpip.h includes winsock2.h
-  only on MinGW.) */
-#ifdef ENABLE_IPV6
-# include <winsock2.h>
-# include <ws2tcpip.h>
-#else
-# include <winsock.h>
-#endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
 
 #ifndef EAI_SYSTEM
 # define EAI_SYSTEM -1   /* value doesn't matter */
@@ -79,10 +73,6 @@ as that of the covered work.  */
 #endif
 
 #include <stdio.h>
-
-/* The same for snprintf() and vsnprintf().  */
-#define snprintf _snprintf
-#define vsnprintf _vsnprintf
 
 /* Define a wgint type under Windows. */
 typedef __int64 wgint;
@@ -114,96 +104,13 @@ typedef __int64 wgint;
 
 #define PATH_SEPARATOR '\\'
 
-/* Win32 doesn't support the MODE argument to mkdir.  */
-#include <direct.h>
-#define mkdir(a, b) (mkdir) (a)
-
 /* Additional declarations needed for IPv6: */
 #ifdef ENABLE_IPV6
 const char *inet_ntop (int, const void *, char *, socklen_t);
 #endif
 
-#ifdef NEED_GAI_STRERROR
-# undef gai_strerror
-# define gai_strerror windows_strerror
-#endif
-
-#ifndef INHIBIT_WRAP
-
-/* Winsock functions don't set errno, so we provide wrappers that do. */
-
-#define socket wrapped_socket
-#define bind wrapped_bind
-#define connect wrapped_connect
-#define listen wrapped_listen
-#define accept wrapped_accept
-#define recv wrapped_recv
-#define send wrapped_send
-#define select wrapped_select
-#define getsockname wrapped_getsockname
-#define getpeername wrapped_getpeername
-#define setsockopt wrapped_setsockopt
-#define closesocket wrapped_closesocket
-
-#endif /* not INHIBIT_WRAP */
-
-int wrapped_socket (int, int, int);
-int wrapped_bind (int, struct sockaddr *, int);
-int wrapped_connect (int, const struct sockaddr *, int);
-int wrapped_listen (int s, int backlog);
-int wrapped_accept (int s, struct sockaddr *a, int *alen);
-int wrapped_recv (int, void *, int, int);
-int wrapped_send (int, const void *, int, int);
-int wrapped_select (int, fd_set *, fd_set *, fd_set *, const struct timeval *);
-int wrapped_getsockname (int, struct sockaddr *, int *);
-int wrapped_getpeername (int, struct sockaddr *, int *);
-int wrapped_setsockopt (int, int, int, const void *, int);
-int wrapped_closesocket (int);
-
-/* Finally, provide a private version of strerror that does the
-   right thing with Winsock errors. */
-#ifndef INHIBIT_WRAP
-# define strerror windows_strerror
-#endif
-const char *windows_strerror (int);
-
-/* Declarations of various socket errors:  */
-
-#define EWOULDBLOCK             WSAEWOULDBLOCK
-#define EINPROGRESS             WSAEINPROGRESS
-#define EALREADY                WSAEALREADY
-#define ENOTSOCK                WSAENOTSOCK
-#define EDESTADDRREQ            WSAEDESTADDRREQ
-#define EMSGSIZE                WSAEMSGSIZE
-#define EPROTOTYPE              WSAEPROTOTYPE
-#define ENOPROTOOPT             WSAENOPROTOOPT
-#define EPROTONOSUPPORT         WSAEPROTONOSUPPORT
-#define ESOCKTNOSUPPORT         WSAESOCKTNOSUPPORT
-#define EOPNOTSUPP              WSAEOPNOTSUPP
-#define EPFNOSUPPORT            WSAEPFNOSUPPORT
-#define EAFNOSUPPORT            WSAEAFNOSUPPORT
-#define EADDRINUSE              WSAEADDRINUSE
-#define EADDRNOTAVAIL           WSAEADDRNOTAVAIL
-#define ENETDOWN                WSAENETDOWN
-#define ENETUNREACH             WSAENETUNREACH
-#define ENETRESET               WSAENETRESET
-#define ECONNABORTED            WSAECONNABORTED
-#define ECONNRESET              WSAECONNRESET
-#define ENOBUFS                 WSAENOBUFS
-#define EISCONN                 WSAEISCONN
-#define ENOTCONN                WSAENOTCONN
-#define ESHUTDOWN               WSAESHUTDOWN
-#define ETOOMANYREFS            WSAETOOMANYREFS
-#define ETIMEDOUT               WSAETIMEDOUT
-#define ECONNREFUSED            WSAECONNREFUSED
-#define ELOOP                   WSAELOOP
-#define EHOSTDOWN               WSAEHOSTDOWN
-#define EHOSTUNREACH            WSAEHOSTUNREACH
-#define EPROCLIM                WSAEPROCLIM
-#define EUSERS                  WSAEUSERS
-#define EDQUOT                  WSAEDQUOT
-#define ESTALE                  WSAESTALE
-#define EREMOTE                 WSAEREMOTE
+/* ioctl needed by set_windows_fd_as_blocking_socket() */
+#include <sys/ioctl.h>
 
 /* Public functions.  */
 
@@ -212,5 +119,6 @@ void ws_changetitle (const char *);
 void ws_percenttitle (double);
 char *ws_mypath (void);
 void windows_main (char **);
+void set_windows_fd_as_blocking_socket (int);
 
 #endif /* MSWINDOWS_H */

@@ -1,6 +1,6 @@
 /* SSL support via OpenSSL library.
    Copyright (C) 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008,
-   2009 Free Software Foundation, Inc.
+   2009, 2010, 2011 Free Software Foundation, Inc.
    Originally contributed by Christian Fraenkel.
 
 This file is part of GNU Wget.
@@ -33,13 +33,11 @@ as that of the covered work.  */
 
 #include <assert.h>
 #include <errno.h>
-#ifdef HAVE_UNISTD_H
-# include <unistd.h>
-#endif
+#include <unistd.h>
 #include <string.h>
 
 #include <openssl/ssl.h>
-#include <openssl/x509.h>
+#include <openssl/x509v3.h>
 #include <openssl/err.h>
 #include <openssl/rand.h>
 
@@ -47,6 +45,10 @@ as that of the covered work.  */
 #include "connect.h"
 #include "url.h"
 #include "ssl.h"
+
+#ifdef WINDOWS
+# include <w32sock.h>
+#endif
 
 /* Application-wide SSL context.  This is common to all SSL
    connections.  */
@@ -159,7 +161,7 @@ key_type_to_ssl_type (enum keyfile_type type)
 bool
 ssl_init ()
 {
-  SSL_METHOD *meth;
+  SSL_METHOD const *meth;
 
   if (ssl_ctx)
     /* The SSL has already been initialized. */
@@ -184,9 +186,11 @@ ssl_init ()
     case secure_protocol_auto:
       meth = SSLv23_client_method ();
       break;
+#ifndef OPENSSL_NO_SSL2
     case secure_protocol_sslv2:
       meth = SSLv2_client_method ();
       break;
+#endif
     case secure_protocol_sslv3:
       meth = SSLv3_client_method ();
       break;
@@ -261,6 +265,7 @@ openssl_read (int fd, char *buf, int bufsize, void *arg)
   while (ret == -1
          && SSL_get_error (conn, ret) == SSL_ERROR_SYSCALL
          && errno == EINTR);
+
   return ret;
 }
 
@@ -283,9 +288,9 @@ openssl_poll (int fd, double timeout, int wait_for, void *arg)
 {
   struct openssl_transport_context *ctx = arg;
   SSL *conn = ctx->conn;
-  if (timeout == 0)
-    return 1;
   if (SSL_pending (conn))
+    return 1;
+  if (timeout == 0)
     return 1;
   return select_fd (fd, timeout, wait_for);
 }
@@ -296,6 +301,8 @@ openssl_peek (int fd, char *buf, int bufsize, void *arg)
   int ret;
   struct openssl_transport_context *ctx = arg;
   SSL *conn = ctx->conn;
+  if (! openssl_poll (fd, 0.0, WAIT_FOR_READ, arg))
+    return 0;
   do
     ret = SSL_peek (conn, buf, bufsize);
   while (ret == -1
@@ -364,11 +371,7 @@ openssl_close (int fd, void *arg)
   xfree_null (ctx->last_error);
   xfree (ctx);
 
-#if defined(WINDOWS) || defined(USE_WATT32)
-  closesocket (fd);
-#else
   close (fd);
-#endif
 
   DEBUGP (("Closed %d/SSL 0x%0*lx\n", fd, PTR_FORMAT (conn)));
 }
@@ -401,7 +404,10 @@ ssl_connect_wget (int fd)
   conn = SSL_new (ssl_ctx);
   if (!conn)
     goto error;
-  if (!SSL_set_fd (conn, fd))
+#ifndef FD_TO_SOCKET
+# define FD_TO_SOCKET(X) (X)
+#endif
+  if (!SSL_set_fd (conn, FD_TO_SOCKET (fd)))
     goto error;
   SSL_set_connect_state (conn);
   if (SSL_connect (conn) <= 0 || conn->state != SSL_ST_OK)
@@ -486,9 +492,11 @@ bool
 ssl_check_certificate (int fd, const char *host)
 {
   X509 *cert;
+  GENERAL_NAMES *subjectAltNames;
   char common_name[256];
   long vresult;
   bool success = true;
+  bool alt_name_checked = false;
 
   /* If the user has specified --no-check-cert, we still want to warn
      him about problems with the server's certificate.  */
@@ -536,7 +544,8 @@ ssl_check_certificate (int fd, const char *host)
           break;
         case X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN:
         case X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT:
-          logprintf (LOG_NOTQUIET, _("  Self-signed certificate encountered.\n"));
+          logprintf (LOG_NOTQUIET,
+                     _("  Self-signed certificate encountered.\n"));
           break;
         case X509_V_ERR_CERT_NOT_YET_VALID:
           logprintf (LOG_NOTQUIET, _("  Issued certificate not yet valid.\n"));
@@ -558,10 +567,6 @@ ssl_check_certificate (int fd, const char *host)
   /* Check that HOST matches the common name in the certificate.
      #### The following remains to be done:
 
-     - It should use dNSName/ipAddress subjectAltName extensions if
-       available; according to rfc2818: "If a subjectAltName extension
-       of type dNSName is present, that MUST be used as the identity."
-
      - When matching against common names, it should loop over all
        common names and choose the most specific one, i.e. the last
        one, not the first one, which the current code picks.
@@ -569,50 +574,124 @@ ssl_check_certificate (int fd, const char *host)
      - Ensure that ASN1 strings from the certificate are encoded as
        UTF-8 which can be meaningfully compared to HOST.  */
 
-  X509_NAME *xname = X509_get_subject_name(cert);
-  common_name[0] = '\0';
-  X509_NAME_get_text_by_NID (xname, NID_commonName, common_name,
-                             sizeof (common_name));
+  subjectAltNames = X509_get_ext_d2i (cert, NID_subject_alt_name, NULL, NULL);
 
-  if (!pattern_match (common_name, host))
+  if (subjectAltNames)
     {
-      logprintf (LOG_NOTQUIET, _("\
-%s: certificate common name %s doesn't match requested host name %s.\n"),
-                 severity, quote_n (0, common_name), quote_n (1, host));
-      success = false;
+      /* Test subject alternative names */
+
+      /* Do we want to check for dNSNAmes or ipAddresses (see RFC 2818)?
+       * Signal it by host_in_octet_string. */
+      ASN1_OCTET_STRING *host_in_octet_string = a2i_IPADDRESS (host);
+
+      int numaltnames = sk_GENERAL_NAME_num (subjectAltNames);
+      int i;
+      for (i=0; i < numaltnames; i++)
+        {
+          const GENERAL_NAME *name =
+            sk_GENERAL_NAME_value (subjectAltNames, i);
+          if (name)
+            {
+              if (host_in_octet_string)
+                {
+                  if (name->type == GEN_IPADD)
+                    {
+                      /* Check for ipAddress */
+                      /* TODO: Should we convert between IPv4-mapped IPv6
+                       * addresses and IPv4 addresses? */
+                      alt_name_checked = true;
+                      if (!ASN1_STRING_cmp (host_in_octet_string,
+                            name->d.iPAddress))
+                        break;
+                    }
+                }
+              else if (name->type == GEN_DNS)
+                {
+                  /* dNSName should be IA5String (i.e. ASCII), however who
+                   * does trust CA? Convert it into UTF-8 for sure. */
+                  unsigned char *name_in_utf8 = NULL;
+
+                  /* Check for dNSName */
+                  alt_name_checked = true;
+
+                  if (0 <= ASN1_STRING_to_UTF8 (&name_in_utf8, name->d.dNSName))
+                    {
+                      /* Compare and check for NULL attack in ASN1_STRING */
+                      if (pattern_match ((char *)name_in_utf8, host) &&
+                            (strlen ((char *)name_in_utf8) ==
+                                ASN1_STRING_length (name->d.dNSName)))
+                        {
+                          OPENSSL_free (name_in_utf8);
+                          break;
+                        }
+                      OPENSSL_free (name_in_utf8);
+                    }
+                }
+            }
+        }
+      sk_GENERAL_NAME_free (subjectAltNames);
+      if (host_in_octet_string)
+        ASN1_OCTET_STRING_free(host_in_octet_string);
+
+      if (alt_name_checked == true && i >= numaltnames)
+        {
+          logprintf (LOG_NOTQUIET,
+              _("%s: no certificate subject alternative name matches\n"
+                "\trequested host name %s.\n"),
+                     severity, quote_n (1, host));
+          success = false;
+        }
     }
-  else
+  
+  if (alt_name_checked == false)
     {
-      /* We now determine the length of the ASN1 string. If it differs from
-       * common_name's length, then there is a \0 before the string terminates.
-       * This can be an instance of a null-prefix attack.
-       *
-       * https://www.blackhat.com/html/bh-usa-09/bh-usa-09-archives.html#Marlinspike
-       * */
+      /* Test commomName */
+      X509_NAME *xname = X509_get_subject_name(cert);
+      common_name[0] = '\0';
+      X509_NAME_get_text_by_NID (xname, NID_commonName, common_name,
+                                 sizeof (common_name));
 
-      int i = -1, j;
-      X509_NAME_ENTRY *xentry;
-      ASN1_STRING *sdata;
-
-      if (xname) {
-        for (;;)
-          {
-            j = X509_NAME_get_index_by_NID (xname, NID_commonName, i);
-            if (j == -1) break;
-            i = j;
-          }
-      }
-
-      xentry = X509_NAME_get_entry(xname,i);
-      sdata = X509_NAME_ENTRY_get_data(xentry);
-      if (strlen (common_name) != ASN1_STRING_length (sdata))
+      if (!pattern_match (common_name, host))
         {
           logprintf (LOG_NOTQUIET, _("\
-%s: certificate common name is invalid (contains a NUL character).\n\
-This may be an indication that the host is not who it claims to be\n\
-(that is, it is not the real %s).\n"),
-                     severity, quote (host));
+    %s: certificate common name %s doesn't match requested host name %s.\n"),
+                     severity, quote_n (0, common_name), quote_n (1, host));
           success = false;
+        }
+      else
+        {
+          /* We now determine the length of the ASN1 string. If it
+           * differs from common_name's length, then there is a \0
+           * before the string terminates.  This can be an instance of a
+           * null-prefix attack.
+           *
+           * https://www.blackhat.com/html/bh-usa-09/bh-usa-09-archives.html#Marlinspike
+           * */
+
+          int i = -1, j;
+          X509_NAME_ENTRY *xentry;
+          ASN1_STRING *sdata;
+
+          if (xname) {
+            for (;;)
+              {
+                j = X509_NAME_get_index_by_NID (xname, NID_commonName, i);
+                if (j == -1) break;
+                i = j;
+              }
+          }
+
+          xentry = X509_NAME_get_entry(xname,i);
+          sdata = X509_NAME_ENTRY_get_data(xentry);
+          if (strlen (common_name) != ASN1_STRING_length (sdata))
+            {
+              logprintf (LOG_NOTQUIET, _("\
+    %s: certificate common name is invalid (contains a NUL character).\n\
+    This may be an indication that the host is not who it claims to be\n\
+    (that is, it is not the real %s).\n"),
+                         severity, quote (host));
+              success = false;
+            }
         }
     }
 
@@ -631,3 +710,7 @@ To connect to %s insecurely, use `--no-check-certificate'.\n"),
   /* Allow --no-check-cert to disable certificate checking. */
   return opt.check_cert ? success : true;
 }
+
+/*
+ * vim: tabstop=2 shiftwidth=2 softtabstop=2
+ */

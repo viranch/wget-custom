@@ -1,11 +1,12 @@
 %option case-insensitive
 %option noyywrap
 %option never-interactive
+%option nounput
 
 %{
 /* Lex source for CSS tokenizing.
    Taken from http://www.w3.org/TR/CSS21/grammar.html#q2
-   Copyright (C) 2006, 2009 Free Software Foundation, Inc.
+   Copyright (C) 2006, 2009, 2010, 2011 Free Software Foundation, Inc.
 
 This file is part of GNU Wget.
 
@@ -33,10 +34,10 @@ Corresponding Source for a non-source form of such a combination
 shall include the source code for the parts of OpenSSL used as well
 as that of the covered work.  */
 
+#define YY_NO_INPUT
+
 #include "css-tokens.h"
 
-/* {s}+\/\*[^*]*\*+([^/*][^*]*\*+)*\/      {unput(' '); } */
-/*replace by space*/
 %}
 
 h               [0-9a-f]

@@ -1,6 +1,7 @@
 /* Dirty system-dependent hacks.
    Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
-   2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation,
+   Inc.
 
 This file is part of GNU Wget.
 
@@ -70,20 +71,6 @@ as that of the covered work.  */
 /* Request the "Unix 98 compilation environment". */
 #define _XOPEN_SOURCE 500
 
-/* For Solaris: request everything else that is available and doesn't
-   conflict with the above.  */
-/* #define __EXTENSIONS__ */ /* XXX clashes with config.h */
-
-/* For Linux: request features of 4.3BSD and SVID (System V Interface
-   Definition). */
-#define _SVID_SOURCE
-#define _BSD_SOURCE
-
-/* Under glibc-based systems we want all GNU extensions as well.  This
-   declares some unnecessary cruft, but also useful functions such as
-   timegm, FNM_CASEFOLD extension to fnmatch, memrchr, etc.  */
-/* #define _GNU_SOURCE */ /* XXX clashes with config.h */
-
 #endif /* NAMESPACE_TWEAKS */
 
 
@@ -131,23 +118,8 @@ void *alloca (size_t);
 # include "mswindows.h"
 #endif
 
-/* Provide support for C99-type boolean type "bool".  This blurb comes
-   straight from the Autoconf 2.59 manual. */
-#if HAVE_STDBOOL_H
+/* Provided by gnulib on systems that don't have it: */
 # include <stdbool.h>
-#else
-# if ! HAVE__BOOL
-#  ifdef __cplusplus
-typedef bool _Bool;
-#  else
-typedef unsigned char _Bool;
-#  endif
-# endif
-# define bool _Bool
-# define false 0
-# define true 1
-# define __bool_true_false_are_defined 1
-#endif
 
 /* Needed for compilation under OS/2 and MSDOS */
 #if defined(__EMX__) || defined(MSDOS)
@@ -216,10 +188,11 @@ void *memrchr (const void *, int, size_t);
 /* These are defined in snprintf.c.  It would be nice to have an
    snprintf.h, though.  */
 #ifndef HAVE_SNPRINTF
-int snprintf ();
+int snprintf (char *str, size_t count, const char *fmt, ...);
 #endif
 #ifndef HAVE_VSNPRINTF
-int vsnprintf ();
+#include <stdarg.h>
+int vsnprintf (char *str, size_t count, const char *fmt, va_list arg);
 #endif
 
 /* Some systems (Linux libc5, "NCR MP-RAS 3.0", and others) don't

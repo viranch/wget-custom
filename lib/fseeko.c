@@ -1,5 +1,7 @@
+/* -*- buffer-read-only: t -*- vi: set ro: */
+/* DO NOT EDIT! GENERATED AUTOMATICALLY! */
 /* An fseeko() function that, together with fflush(), is POSIX compliant.
-   Copyright (C) 2007-2009 Free Software Foundation, Inc.
+   Copyright (C) 2007-2011 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -25,14 +27,13 @@
 
 #include "stdio-impl.h"
 
+int
+fseeko (FILE *fp, off_t offset, int whence)
 #undef fseeko
 #if !HAVE_FSEEKO
 # undef fseek
 # define fseeko fseek
 #endif
-
-int
-rpl_fseeko (FILE *fp, off_t offset, int whence)
 {
 #if LSEEK_PIPE_BROKEN
   /* mingw gives bogus answers rather than failure on non-seekable files.  */
@@ -50,10 +51,10 @@ rpl_fseeko (FILE *fp, off_t offset, int whence)
   if ((fp->_flags & __SL64) == 0)
     {
       /* Cygwin 1.5.0 through 1.5.24 failed to open stdin in 64-bit
-	 mode; but has an fseeko that requires 64-bit mode.  */
+         mode; but has an fseeko that requires 64-bit mode.  */
       FILE *tmp = fopen ("/dev/null", "r");
       if (!tmp)
-	return -1;
+        return -1;
       fp->_flags |= __SL64;
       fp->_seek64 = tmp->_seek64;
       fclose (tmp);
@@ -62,22 +63,25 @@ rpl_fseeko (FILE *fp, off_t offset, int whence)
   if (fp_->_p == fp_->_bf._base
       && fp_->_r == 0
       && fp_->_w == ((fp_->_flags & (__SLBF | __SNBF | __SRD)) == 0 /* fully buffered and not currently reading? */
-		     ? fp_->_bf._size
-		     : 0)
+                     ? fp_->_bf._size
+                     : 0)
       && fp_ub._base == NULL)
 #elif defined __EMX__               /* emx+gcc */
   if (fp->_ptr == fp->_buffer
       && fp->_rcount == 0
       && fp->_wcount == 0
       && fp->_ungetc_count == 0)
-#elif defined _IOERR                /* AIX, HP-UX, IRIX, OSF/1, Solaris, OpenServer, mingw */
+#elif defined __minix               /* Minix */
+  if (fp_->_ptr == fp_->_buf
+      && (fp_->_ptr == NULL || fp_->_count == 0))
+#elif defined _IOERR                /* AIX, HP-UX, IRIX, OSF/1, Solaris, OpenServer, mingw, NonStop Kernel */
   if (fp_->_ptr == fp_->_base
       && (fp_->_ptr == NULL || fp_->_cnt == 0))
 #elif defined __UCLIBC__            /* uClibc */
   if (((fp->__modeflags & __FLAG_WRITING) == 0
        || fp->__bufpos == fp->__bufstart)
       && ((fp->__modeflags & (__FLAG_READONLY | __FLAG_READING)) == 0
-	  || fp->__bufpos == fp->__bufread))
+          || fp->__bufpos == fp->__bufread))
 #elif defined __QNX__               /* QNX */
   if ((fp->_Mode & 0x2000 /* _MWRITE */ ? fp->_Next == fp->_Buf : fp->_Next == fp->_Rend)
       && fp->_Rback == fp->_Back + sizeof (fp->_Back)
@@ -91,40 +95,51 @@ rpl_fseeko (FILE *fp, off_t offset, int whence)
   #error "Please port gnulib fseeko.c to your platform! Look at the code in fpurge.c, then report this to bug-gnulib."
 #endif
     {
-      /* We get here when an fflush() call immediately preceded this one.  We
-	 know there are no buffers.
-	 POSIX requires us to modify the file descriptor's position.
-	 But we cannot position beyond end of file here.  */
-      off_t pos =
-	lseek (fileno (fp),
-	       whence == SEEK_END && offset > 0 ? 0 : offset,
-	       whence);
+      /* We get here when an fflush() call immediately preceded this one (or
+         if ftell() has created buffers but no I/O has occurred on a
+         newly-opened stream).  We know there are no buffers.  */
+      off_t pos = lseek (fileno (fp), offset, whence);
       if (pos == -1)
-	{
+        {
 #if defined __sferror || defined __DragonFly__ /* FreeBSD, NetBSD, OpenBSD, DragonFly, MacOS X, Cygwin */
-	  fp_->_flags &= ~__SOFF;
+          fp_->_flags &= ~__SOFF;
 #endif
-	  return -1;
-	}
+          return -1;
+        }
 
 #if defined _IO_ftrylockfile || __GNU_LIBRARY__ == 1 /* GNU libc, BeOS, Haiku, Linux libc5 */
       fp->_flags &= ~_IO_EOF_SEEN;
+      fp->_offset = pos;
 #elif defined __sferror || defined __DragonFly__ /* FreeBSD, NetBSD, OpenBSD, DragonFly, MacOS X, Cygwin */
+# if defined __CYGWIN__
+      /* fp_->_offset is typed as an integer.  */
       fp_->_offset = pos;
+# else
+      /* fp_->_offset is an fpos_t.  */
+      {
+        /* Use a union, since on NetBSD, the compilation flags
+           determine whether fpos_t is typedef'd to off_t or a struct
+           containing a single off_t member.  */
+        union
+          {
+            fpos_t f;
+            off_t o;
+          } u;
+        u.o = pos;
+        fp_->_offset = u.f;
+      }
+# endif
       fp_->_flags |= __SOFF;
       fp_->_flags &= ~__SEOF;
 #elif defined __EMX__               /* emx+gcc */
       fp->_flags &= ~_IOEOF;
-#elif defined _IOERR                /* AIX, HP-UX, IRIX, OSF/1, Solaris, OpenServer, mingw */
+#elif defined _IOERR                /* AIX, HP-UX, IRIX, OSF/1, Solaris, OpenServer, mingw, NonStop Kernel */
       fp->_flag &= ~_IOEOF;
 #elif defined __MINT__              /* Atari FreeMiNT */
       fp->__offset = pos;
       fp->__eof = 0;
 #endif
-      /* If we were not requested to position beyond end of file, we're
-	 done.  */
-      if (!(whence == SEEK_END && offset > 0))
-	return 0;
+      return 0;
     }
   return fseeko (fp, offset, whence);
 }

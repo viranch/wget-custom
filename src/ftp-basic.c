@@ -1,6 +1,7 @@
 /* Basic FTP routines.
    Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
-   2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation,
+   Inc.
 
 This file is part of GNU Wget.
 
@@ -36,9 +37,7 @@ as that of the covered work.  */
 #include <errno.h>
 
 #include <string.h>
-#ifdef HAVE_UNISTD_H
-# include <unistd.h>
-#endif
+#include <unistd.h>
 #include "utils.h"
 #include "connect.h"
 #include "host.h"
@@ -756,9 +755,6 @@ ftp_epsv (int csock, ip_address *ip, int *port)
 
   DEBUGP(("respline is %s\n", respline));
 
-  /* Parse the response.  */
-  s = respline;
-
   /* Skip the useless stuff and get what's inside the parentheses */
   start = strchr (respline, '(');
   if (start == NULL)
@@ -804,7 +800,7 @@ ftp_epsv (int csock, ip_address *ip, int *port)
       return FTPINVPASV;
     }
 
-  if (*s++ != ')')
+  if (*s != ')')
     {
       xfree (respline);
       return FTPINVPASV;

@@ -1,6 +1,7 @@
 /* Miscellaneous declarations.
    Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
-   2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation,
+   Inc.
 
 This file is part of GNU Wget.
 
@@ -38,6 +39,10 @@ as that of the covered work.  */
 
 #include "config.h"
 
+#if ((defined _WIN32 || defined __WIN32__) && !defined __CYGWIN__)
+# define WINDOWS
+#endif
+
 /* Include these, so random files need not include them.  */
 #include "sysdep.h"
 
@@ -47,7 +52,7 @@ as that of the covered work.  */
 #endif
 
 /* Is OpenSSL or GNUTLS available? */
-#if defined HAVE_LIBSSL || defined HAVE_LIBGNUTLS
+#if defined HAVE_LIBSSL || defined HAVE_LIBSSL32 || defined HAVE_LIBGNUTLS
 # define HAVE_SSL
 #endif
 
@@ -347,7 +352,8 @@ typedef enum
   RETRBADPATTERN, RETNOTSUP /* ! */, ROBOTSOK /* ! */, NOROBOTS /* ! */,
   PROXERR,
   /* 50  */
-  AUTHFAILED, QUOTEXC, WRITEFAILED, SSLINITFAILED, VERIFCERTERR
+  AUTHFAILED, QUOTEXC, WRITEFAILED, SSLINITFAILED, VERIFCERTERR,
+  UNLINKERR, NEWLOCATION_KEEP_POST
 } uerr_t;
 
 /* 2005-02-19 SMS.

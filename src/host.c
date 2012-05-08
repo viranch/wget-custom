@@ -1,6 +1,7 @@
 /* Host name resolution and matching.
    Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
-   2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation,
+   Inc.
 
 This file is part of GNU Wget.
 
@@ -49,6 +50,8 @@ as that of the covered work.  */
 # endif /* def __VMS [else] */
 # define SET_H_ERRNO(err) ((void)(h_errno = (err)))
 #else  /* WINDOWS */
+# include <winsock2.h>
+# include <ws2tcpip.h>
 # define SET_H_ERRNO(err) WSASetLastError (err)
 #endif /* WINDOWS */
 
@@ -63,7 +66,7 @@ as that of the covered work.  */
 # define NO_ADDRESS NO_DATA
 #endif
 
-#if !HAVE_DECL_H_ERRNO
+#if !HAVE_DECL_H_ERRNO && !defined(WINDOWS)
 extern int h_errno;
 #endif
 
@@ -345,7 +348,7 @@ gethostbyname_with_timeout (const char *host_name, double timeout)
 }
 
 /* Print error messages for host errors.  */
-static char *
+static const char *
 host_errstr (int error)
 {
   /* Can't use switch since some of these constants can be equal,
@@ -819,11 +822,15 @@ lookup_host (const char *host, int flags)
 #endif /* not ENABLE_IPV6 */
 
   /* Print the addresses determined by DNS lookup, but no more than
-     three.  */
+     three if show_all_dns_entries is not specified.  */
   if (!silent && !numeric_address)
     {
       int i;
-      int printmax = al->count <= 3 ? al->count : 3;
+      int printmax = al->count;
+
+      if (!opt.show_all_dns_entries && printmax > 3)
+          printmax = 3;
+
       for (i = 0; i < printmax; i++)
         {
           logputs (LOG_VERBOSE, print_address (al->addresses + i));
@@ -874,6 +881,9 @@ sufmatch (const char **list, const char *what)
   lw = strlen (what);
   for (i = 0; list[i]; i++)
     {
+      if (list[i][0] == '\0')
+        continue;
+
       for (j = strlen (list[i]), k = lw; j >= 0 && k >= 0; j--, k--)
         if (c_tolower (list[i][j]) != c_tolower (what[k]))
           break;

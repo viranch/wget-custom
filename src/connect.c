@@ -1,6 +1,7 @@
 /* Establishing and handling network connections.
    Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003,
-   2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software
+   Foundation, Inc.
 
 This file is part of GNU Wget.
 
@@ -32,13 +33,13 @@ as that of the covered work.  */
 
 #include <stdio.h>
 #include <stdlib.h>
-#ifdef HAVE_UNISTD_H
-# include <unistd.h>
-#endif
+#include <unistd.h>
 #include <assert.h>
 
+#include <sys/socket.h>
+#include <sys/select.h>
+
 #ifndef WINDOWS
-# include <sys/socket.h>
 # ifdef __VMS
 #  include "vms_ip.h"
 # else /* def __VMS */
@@ -52,9 +53,6 @@ as that of the covered work.  */
 
 #include <errno.h>
 #include <string.h>
-#ifdef HAVE_SYS_SELECT_H
-# include <sys/select.h>
-#endif /* HAVE_SYS_SELECT_H */
 #ifdef HAVE_SYS_TIME_H
 # include <sys/time.h>
 #endif
@@ -542,10 +540,11 @@ bool
 socket_ip_address (int sock, ip_address *ip, int endpoint)
 {
   struct sockaddr_storage storage;
-  struct sockaddr *sockaddr = (struct sockaddr *)&storage;
+  struct sockaddr *sockaddr = (struct sockaddr *) &storage;
   socklen_t addrlen = sizeof (storage);
   int ret;
 
+  memset (sockaddr, 0, addrlen);
   if (endpoint == ENDPOINT_LOCAL)
     ret = getsockname (sock, sockaddr, &addrlen);
   else if (endpoint == ENDPOINT_PEER)
@@ -657,7 +656,14 @@ select_fd (int fd, double maxtime, int wait_for)
   tmout.tv_usec = 1000000 * (maxtime - (long) maxtime);
 
   do
+  {
     result = select (fd + 1, rd, wr, NULL, &tmout);
+#ifdef WINDOWS
+    /* gnulib select() converts blocking sockets to nonblocking in windows.
+       wget uses blocking sockets so we must convert them back to blocking.  */
+    set_windows_fd_as_blocking_socket (fd);
+#endif
+  }
   while (result < 0 && errno == EINTR);
 
   return result;
@@ -679,6 +685,7 @@ test_socket_open (int sock)
 {
   fd_set check_set;
   struct timeval to;
+  int ret = 0;
 
   /* Check if we still have a valid (non-EOF) connection.  From Andrew
    * Maholski's code in the Unix Socket FAQ.  */
@@ -690,7 +697,15 @@ test_socket_open (int sock)
   to.tv_sec = 0;
   to.tv_usec = 1;
 
-  if (select (sock + 1, &check_set, NULL, NULL, &to) == 0)
+  ret = select (sock + 1, &check_set, NULL, NULL, &to);
+#ifdef WINDOWS
+/* gnulib select() converts blocking sockets to nonblocking in windows.
+wget uses blocking sockets so we must convert them back to blocking
+*/
+  set_windows_fd_as_blocking_socket ( sock );
+#endif
+
+  if ( !ret )
     /* We got a timeout, it means we're still connected. */
     return true;
   else
@@ -700,17 +715,6 @@ test_socket_open (int sock)
 }
 
 /* Basic socket operations, mostly EINTR wrappers.  */
-
-#if defined(WINDOWS) || defined(USE_WATT32)
-# define read(fd, buf, cnt) recv (fd, buf, cnt, 0)
-# define write(fd, buf, cnt) send (fd, buf, cnt, 0)
-# define close(fd) closesocket (fd)
-#endif
-
-#ifdef __BEOS__
-# define read(fd, buf, cnt) recv (fd, buf, cnt, 0)
-# define write(fd, buf, cnt) send (fd, buf, cnt, 0)
-#endif
 
 static int
 sock_read (int fd, char *buf, int bufsize)

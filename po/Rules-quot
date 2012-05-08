@@ -4,18 +4,13 @@ DISTFILES.common.extra1 = quot.sed boldquot.sed en@quot.header en@boldquot.heade
 
 .SUFFIXES: .insert-header .po-update-en
 
-en@quot.po: en@quot.po-create
 en@quot.po-create:
 	$(MAKE) en@quot.po-update
-en@boldquot.po: en@boldquot.po-create
 en@boldquot.po-create:
 	$(MAKE) en@boldquot.po-update
 
 en@quot.po-update: en@quot.po-update-en
 en@boldquot.po-update: en@boldquot.po-update-en
-
-en@quot.po-update-en: $(srcdir)/$(DOMAIN).pot
-en@boldquot.po-update-en: $(srcdir)/$(DOMAIN).pot
 
 .insert-header.po-update-en:
 	@lang=`echo $@ | sed -e 's/\.po-update-en$$//'`; \
@@ -49,11 +44,4 @@ en@boldquot.insert-header: insert-header.sin
 
 mostlyclean: mostlyclean-quot
 mostlyclean-quot:
-	rm -f *.insert-header en_US.po
-
-en_US.po: en_US.po-update
-
-en_US.po-update: en@quot.po
-	if test -r en@quot.po; then realcat=en@quot.po; \
-           else realcat=$(srcdir)/en@quot.po; fi; \
-	cp $$realcat en_US.po
+	rm -f *.insert-header

@@ -1,5 +1,5 @@
 /* Internationalization related declarations.
-   Copyright (C) 2008, 2009 Free Software Foundation, Inc.
+   Copyright (C) 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
 
 This file is part of GNU Wget.
 
@@ -54,9 +54,9 @@ void set_content_encoding (struct iri *i, char *charset);
 
 #else /* ENABLE_IRI */
 
-struct iri dummy_iri;
+extern struct iri dummy_iri;
 
-#define parse_charset(str)          NULL
+#define parse_charset(str)          (str, NULL)
 #define find_locale()               NULL
 #define check_encoding_name(str)    false
 #define locale_to_utf8(str)         (str)

@@ -1,6 +1,6 @@
 # Makefile for `wget' utility
-# Copyright (C) 1995, 1996, 1997, 2007, 2008, 2009 Free Software
-# Foundation, Inc.
+# Copyright (C) 1995, 1996, 1997, 2007, 2008, 2009, 2010, 2011 Free
+# Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -54,7 +54,7 @@ EXTRA_DIST = sample.wgetrc \
 	     texi2pod.pl
 
 wget.pod: $(srcdir)/wget.texi version.texi
-	$(TEXI2POD) $(srcdir)/wget.texi $@
+	$(TEXI2POD) -D VERSION="$(VERSION)" $(srcdir)/wget.texi $@
 
 $(MAN): wget.pod
 	$(POD2MAN) --center="GNU Wget" --release="GNU Wget @VERSION@" $? > $@

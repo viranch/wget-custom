@@ -1,6 +1,6 @@
 /* Messages logging.
    Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006,
-   2007, 2008, 2009 Free Software Foundation, Inc.
+   2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
 
 This file is part of GNU Wget.
 
@@ -34,9 +34,7 @@ as that of the covered work.  */
 #include <string.h>
 #include <stdlib.h>
 #include <stdarg.h>
-#ifdef HAVE_UNISTD_H
-# include <unistd.h>
-#endif
+#include <unistd.h>
 #include <assert.h>
 #include <errno.h>
 
@@ -501,6 +499,9 @@ logprintf (enum log_options o, const char *fmt, ...)
       va_start (args, fmt);
       done = log_vprintf_internal (&lpstate, fmt, args);
       va_end (args);
+
+      if (done && errno == EPIPE)
+        exit (1);
     }
   while (!done);
 }

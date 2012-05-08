@@ -1,6 +1,7 @@
 dnl Wget-specific Autoconf macros.
 dnl Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003,
-dnl 2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+dnl 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software
+dnl Foundation, Inc.
 
 dnl This program is free software; you can redistribute it and/or modify
 dnl it under the terms of the GNU General Public License as published by
@@ -39,36 +40,6 @@ AC_DEFUN([WGET_STRUCT_UTIMBUF], [
 #if HAVE_UTIME_H
 # include <utime.h>
 #endif
-  ])
-])
-
-
-dnl Check for socklen_t.  The third argument of accept, getsockname,
-dnl etc. is int * on some systems, but size_t * on others.  POSIX
-dnl finally standardized on socklen_t, but older systems don't have
-dnl it.  If socklen_t exists, we use it, else if accept() accepts
-dnl size_t *, we use that, else we use int.
-
-AC_DEFUN([WGET_SOCKLEN_T], [
-  AC_MSG_CHECKING(for socklen_t)
-  AC_COMPILE_IFELSE([
-#include <sys/types.h>
-#include <sys/socket.h>
-socklen_t x;
-  ], [AC_MSG_RESULT(socklen_t)], [
-    AC_COMPILE_IFELSE([
-#include <sys/types.h>
-#include <sys/socket.h>
-int accept (int, struct sockaddr *, size_t *);
-    ], [
-      AC_MSG_RESULT(size_t)
-      AC_DEFINE([socklen_t], [size_t],
-                [Define to int or size_t on systems without socklen_t.])
-    ], [
-      AC_MSG_RESULT(int)
-      AC_DEFINE([socklen_t], [int],
-                [Define to int or size_t on systems without socklen_t.])
-    ])
   ])
 ])
 
@@ -151,8 +122,18 @@ AC_DEFUN([TYPE_STRUCT_SOCKADDR_IN6],[
     wget_have_sockaddr_in6=no
   ],[
 #include <sys/types.h>
+#ifdef HAVE_SYS_SOCKET_H
 #include <sys/socket.h>
+#endif
+#ifdef HAVE_NETINET_IN_H
 #include <netinet/in.h>
+#endif
+#ifdef HAVE_WINSOCK2_H
+#include <winsock2.h>
+#endif
+#ifdef HAVE_WS2TCPIP_H
+#include <ws2tcpip.h>
+#endif
   ])
 
   if test "X$wget_have_sockaddr_in6" = "Xyes"; then :
@@ -174,8 +155,18 @@ AC_DEFUN([MEMBER_SIN6_SCOPE_ID],[
       wget_member_sin6_scope_id=no
     ],[
 #include <sys/types.h>
+#ifdef HAVE_SYS_SOCKET_H
 #include <sys/socket.h>
+#endif
+#ifdef HAVE_NETINET_IN_H
 #include <netinet/in.h>
+#endif
+#ifdef HAVE_WINSOCK2_H
+#include <winsock2.h>
+#endif
+#ifdef HAVE_WS2TCPIP_H
+#include <ws2tcpip.h>
+#endif
     ])
   fi
 
@@ -193,13 +184,23 @@ AC_DEFUN([PROTO_INET6],[
   AC_CACHE_CHECK([for INET6 protocol support], [wget_cv_proto_inet6],[
     AC_TRY_CPP([
 #include <sys/types.h>
+#ifdef HAVE_SYS_SOCKET_H
 #include <sys/socket.h>
-
+#endif
+#ifdef HAVE_NETINET_IN_H
+#include <netinet/in.h>
+#endif
+#ifdef HAVE_WINSOCK2_H
+#include <winsock2.h>
+#endif
+#ifdef HAVE_WS2TCPIP_H
+#include <ws2tcpip.h>
+#endif
 #ifndef PF_INET6
 #error Missing PF_INET6
 #endif
 #ifndef AF_INET6
-#error Mlssing AF_INET6
+#error Missing AF_INET6
 #endif
     ],[
       wget_cv_proto_inet6=yes
@@ -219,8 +220,13 @@ AC_DEFUN([PROTO_INET6],[
 AC_DEFUN([WGET_STRUCT_SOCKADDR_STORAGE],[
   AC_CHECK_TYPES([struct sockaddr_storage],[], [], [
 #include <sys/types.h>
+#ifdef HAVE_SYS_SOCKET_H
 #include <sys/socket.h>
-  ])
+#endif
+#ifdef HAVE_WINSOCK2_H
+#include <winsock2.h>
+#endif
+])
 ])
 
 dnl ************************************************************

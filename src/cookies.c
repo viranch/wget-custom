@@ -1,6 +1,6 @@
 /* Support for cookies.
-   Copyright (C) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
-   Free Software Foundation, Inc.
+   Copyright (C) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009,
+   2010, 2011 Free Software Foundation, Inc.
 
 This file is part of GNU Wget.
 
@@ -350,6 +350,13 @@ parse_set_cookie (const char *set_cookie, bool silent)
     goto error;
   if (!value.b)
     goto error;
+
+  /* If the value is quoted, do not modify it.  */
+  if (*(value.b - 1) == '"')
+    value.b--;
+  if (*value.e == '"')
+    value.e++;
+
   cookie->attr = strdupdelim (name.b, name.e);
   cookie->value = strdupdelim (value.b, value.e);
 

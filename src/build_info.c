@@ -9,76 +9,65 @@
 #include "wget.h"
 #include <stdio.h>
 
-const char* (compiled_features[]) =
+const char *compiled_features[] =
 {
 
-#ifdef ENABLE_DIGEST
+#if defined ENABLE_DIGEST
   "+digest",
 #else
   "-digest",
 #endif
 
-#ifdef ENABLE_IPV6
-  "+ipv6",
-#else
-  "-ipv6",
-#endif
-
-#ifdef ENABLE_NLS
-  "+nls",
-#else
-  "-nls",
-#endif
-
-#ifdef ENABLE_NTLM
-  "+ntlm",
-#else
-  "-ntlm",
-#endif
-
-#ifdef ENABLE_OPIE
-  "+opie",
-#else
-  "-opie",
-#endif
-
-#ifdef HAVE_MD5
-#ifdef HAVE_BUILTIN_MD5
-  "+md5/builtin",
-#elif HAVE_OPENSSL_MD5
-  "+md5/openssl",
-#elif HAVE_SOLARIS_MD5
-  "+md5/solaris",
-#else
-#error "md5 set, but no library found!",
-#endif
-#else
-  "-md5",
-#endif
-
-#ifdef HAVE_SSL
+#if defined HAVE_SSL
   "+https",
 #else
   "-https",
 #endif
 
-#ifdef HAVE_LIBGNUTLS
-  "+gnutls",
+#if defined ENABLE_IPV6
+  "+ipv6",
 #else
-  "-gnutls",
+  "-ipv6",
 #endif
 
-#ifdef HAVE_LIBSSL
-  "+openssl",
-#else
-  "-openssl",
-#endif
-
-#ifdef ENABLE_IRI
+#if defined ENABLE_IRI
   "+iri",
 #else
   "-iri",
 #endif
+
+#if SIZEOF_OFF_T >= 8
+  "+large-file",
+#else
+  "-large-file",
+#endif
+
+#if defined ENABLE_NLS
+  "+nls",
+#else
+  "-nls",
+#endif
+
+#if defined ENABLE_NTLM
+  "+ntlm",
+#else
+  "-ntlm",
+#endif
+
+#if defined ENABLE_OPIE
+  "+opie",
+#else
+  "-opie",
+#endif
+
+#if defined HAVE_LIBSSL
+  "+ssl/openssl",
+#elif defined HAVE_LIBGNUTLS
+  "+ssl/gnutls",
+#else 
+  "-ssl",
+#endif
+
 
   /* sentinel value */
   NULL

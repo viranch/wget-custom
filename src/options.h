@@ -1,6 +1,7 @@
 /* struct options.
    Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
-   2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation,
+   Inc.
 
 This file is part of GNU Wget.
 
@@ -54,9 +55,11 @@ struct options
   bool protocol_directories;	/* Whether to prepend "http"/"ftp" to dirs. */
   bool noclobber;		/* Disables clobbering of existing
 				   data. */
+  bool unlink;			/* remove file before clobbering */
   char *dir_prefix;		/* The top of directory tree */
   char *lfilename;		/* Log filename */
   char *input_filename;		/* Input filename */
+  char *choose_config;		/* Specified config file */
   bool force_html;		/* Is the input file an HTML file? */
 
   char *default_page;           /* Alternative default page (index file) */
@@ -242,10 +245,16 @@ struct options
   char *encoding_remote;
   char *locale;
 
+  bool trustservernames;
 #ifdef __VMS
   int ftp_stmlf;                /* Force Stream_LF format for binary FTP. */
 #endif /* def __VMS */
 
+  bool useservertimestamps;  	/* Update downloaded files' timestamps to
+				   match those on server? */
+
+  bool show_all_dns_entries; /* Show all the DNS entries when resolving a
+                                name. */
 };
 
 extern struct options opt;

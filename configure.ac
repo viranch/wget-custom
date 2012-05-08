@@ -1,6 +1,6 @@
 dnl Template file for GNU Autoconf
-dnl Copyright (C) 1995, 1996, 1997, 2001, 2007, 2008, 2009 Free Software
-dnl Foundation, Inc.
+dnl Copyright (C) 1995, 1996, 1997, 2001, 2007, 2008, 2009, 2010, 2011
+dnl Free Software Foundation, Inc.
 
 dnl This program is free software; you can redistribute it and/or modify
 dnl it under the terms of the GNU General Public License as published by
@@ -31,7 +31,7 @@ dnl Process this file with autoconf to produce a configure script.
 dnl
 
 AC_INIT([wget],
-	[1.12],
+  [m4_esyscmd([build-aux/bzr-version-gen])],
 	[bug-wget@gnu.org])
 AC_PREREQ(2.61)
 
@@ -43,10 +43,12 @@ AC_MSG_NOTICE([configuring for GNU Wget $PACKAGE_VERSION])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([build-aux])
 
+AC_CONFIG_SRCDIR([src/wget.h])
+
 dnl
 dnl Automake setup
 dnl
-AM_INIT_AUTOMAKE(dist-bzip2 dist-lzma 1.9)
+AM_INIT_AUTOMAKE([1.9])
 
 dnl
 dnl Get cannonical host
@@ -60,7 +62,8 @@ dnl Process features.
 dnl
 
 AC_ARG_WITH(ssl,
-[[  --without-ssl           disable SSL autodetection]])
+[[  --without-ssl           disable SSL autodetection
+  --with-ssl={gnutls,openssl} specify the SSL backend.  GNU TLS is the default.]])
 
 AC_ARG_ENABLE(opie,
 [  --disable-opie          disable support for opie or s/key FTP login],
@@ -84,13 +87,6 @@ ENABLE_DEBUG=$enableval, ENABLE_DEBUG=yes)
 test x"${ENABLE_DEBUG}" = xyes && AC_DEFINE([ENABLE_DEBUG], 1,
    [Define if you want the debug output support compiled in.])
 
-wget_need_md5=no
-
-case "${ENABLE_OPIE}${ENABLE_DIGEST}" in
-*yes*)
-	wget_need_md5=yes
-esac
-
 dnl
 dnl Find the compiler
 dnl
@@ -104,7 +100,6 @@ AM_PROG_CC_C_O
 AC_AIX
 
 gl_EARLY
-md5_EARLY
 
 dnl
 dnl Gettext
@@ -171,11 +166,11 @@ dnl Check sizes of integer types.  These are used to find n-bit
 dnl integral types on older systems that fail to provide intN_t and
 dnl uintN_t typedefs.
 dnl
-AC_CHECK_SIZEOF(short)
-AC_CHECK_SIZEOF(int)
-AC_CHECK_SIZEOF(long)
-AC_CHECK_SIZEOF(long long)
-AC_CHECK_SIZEOF(void *)
+AC_CHECK_SIZEOF([short])
+AC_CHECK_SIZEOF([int])
+AC_CHECK_SIZEOF([long])
+AC_CHECK_SIZEOF([long long])
+AC_CHECK_SIZEOF([void *])
 
 dnl
 dnl Checks for non-universal or system-specific types.
@@ -200,8 +195,9 @@ dnl Checks for library functions.
 dnl
 AC_FUNC_MMAP
 AC_FUNC_FSEEKO
-AC_CHECK_FUNCS(strptime timegm snprintf vsnprintf vasprintf drand48)
+AC_CHECK_FUNCS(strptime timegm vsnprintf vasprintf drand48)
 AC_CHECK_FUNCS(strtoll usleep ftello sigblock sigsetjmp memrchr wcwidth mbtowc)
+AC_CHECK_FUNCS(sleep symlink utime)
 
 if test x"$ENABLE_OPIE" = xyes; then
   AC_LIBOBJ([ftp-opie])
@@ -215,37 +211,33 @@ AC_DEFINE([HAVE_STRCASECMP], 1, [Define to 1 if you have the `strcasecmp' functi
 AC_DEFINE([HAVE_STRNCASECMP], 1, [Define to 1 if you have the `strncasecmp' function.])
 AC_DEFINE([HAVE_STRDUP], 1, [Define to 1 if you have the `strdup' function.])
 AC_DEFINE([HAVE_ISATTY], 1, [Define to 1 if you have the `isatty' function.])
-AC_DEFINE([HAVE_SYMLINK], 1, [Define to 1 if you have the `symlink' function.])
 
 dnl
 dnl Call Wget-specific macros defined in aclocal.
 dnl
 WGET_STRUCT_UTIMBUF
-WGET_SOCKLEN_T
 WGET_FNMATCH
 WGET_NANOSLEEP
 WGET_POSIX_CLOCK
 WGET_NSL_SOCKET
 
+dnl Deal with specific hosts
+case $host_os in
+  *mingw32* )
+    LIBS+=' -lws2_32'
+    AC_LIBOBJ([mswindows])
+    ;;
+esac
+
+
 dnl
 dnl Checks for libraries.
 dnl
 
-AS_IF([test x"$with_ssl" = xgnutls], [
-  dnl Now actually check for -lssl
-  AC_LIB_HAVE_LINKFLAGS([gnutls], [], [
-#include <gnutls/gnutls.h>
-  ], [gnutls_global_init()])
-  if test x"$LIBGNUTLS" != x
-  then
-    AC_MSG_NOTICE([compiling in support for SSL via GnuTLS])
-    AC_LIBOBJ([gnutls])
-  else
-    AC_MSG_ERROR([--with-ssl=gnutls was given, but GNUTLS is not available.])
-  fi
-], [
-  # --with-ssl is not gnutls: check if it's no
-  AS_IF([test x"$with_ssl" != xno], [
+AS_IF([test x"$with_ssl" = xopenssl], [
+    dnl some versions of openssl use zlib compression
+    AC_CHECK_LIB(z, compress)
+
     dnl As of this writing (OpenSSL 0.9.6), the libcrypto shared library
     dnl doesn't record its dependency on libdl, so we need to make sure
     dnl -ldl ends up in LIBS on systems that have it.  Most OSes use
@@ -254,8 +246,32 @@ AS_IF([test x"$with_ssl" = xgnutls], [
       AC_CHECK_LIB(dl, shl_load)
     ])
 
-    dnl Now actually check for -lssl
-    AC_LIB_HAVE_LINKFLAGS([ssl], [crypto], [
+    ssl_found=no
+    case $host_os in
+      *mingw32* )
+        dnl prefer link to openssl dlls if possible. if not then fallback on static libs. if not then error
+        
+        AC_CHECK_LIB(eay32, EVP_MD_CTX_init)
+        if test x"$ac_cv_lib_eay32_EVP_MD_CTX_init" != xno
+        then
+          AC_CHECK_LIB(ssl32, SSL_connect, [
+            ssl_found=yes
+            AC_MSG_NOTICE([Enabling support for SSL via OpenSSL (shared)])
+          ],
+          AC_MSG_ERROR([openssl not found: shared lib eay32 found but ssl32 not found]))
+          
+        else
+          LIBS+=' -lgdi32'
+          dnl fallback and test static libs
+        fi
+        dnl add zdll lib as dep for above tests?
+      ;;
+    esac
+
+AS_IF([test x$ssl_found != xyes],
+[
+  dnl Now actually check for -lssl if it wasn't already found
+    AC_LIB_HAVE_LINKFLAGS([ssl], [crypto z], [
   #include <openssl/ssl.h>
   #include <openssl/x509.h>
   #include <openssl/err.h>
@@ -268,13 +284,41 @@ AS_IF([test x"$with_ssl" = xgnutls], [
     then
       AC_MSG_NOTICE([compiling in support for SSL via OpenSSL])
       AC_LIBOBJ([openssl])
+      LIBS="$LIBSSL $LIBS"
     elif test x"$with_ssl" != x
     then
-      AC_MSG_ERROR([--with-ssl was given, but SSL is not available.])
+      AC_MSG_ERROR([--with-ssl=openssl was given, but SSL is not available.])
     fi
-  ]) # endif: --with-ssl == no?
-]) # endif: --with-ssl == gnutls?
 
+    AC_LIBOBJ([openssl])
+
+])
+
+], [
+  # --with-ssl is not gnutls: check if it's no
+  AS_IF([test x"$with_ssl" != xno], [
+    dnl Now actually check for -lssl
+
+    AC_CHECK_LIB(z, compress)
+    AC_CHECK_LIB(gpg-error, gpg_err_init)
+    AC_CHECK_LIB(gcrypt, gcry_control)
+
+  dnl Now actually check for -lssl
+  AC_LIB_HAVE_LINKFLAGS([gnutls], [], [
+#include <gnutls/gnutls.h>
+  ], [gnutls_global_init()])
+  if test x"$LIBGNUTLS" != x
+  then
+    AC_MSG_NOTICE([compiling in support for SSL via GnuTLS])
+    AC_LIBOBJ([gnutls])
+    LIBS="$LIBGNUTLS $LIBS"
+  else
+    AC_MSG_ERROR([--with-ssl was given, but GNUTLS is not available.])
+  fi
+
+  AC_CHECK_FUNCS(gnutls_priority_set_direct)
+  ]) # endif: --with-ssl == no?
+]) # endif: --with-ssl == openssl?
 
 dnl Enable NTLM if requested and if SSL is available.
 if test x"$LIBSSL" != x
@@ -294,74 +338,15 @@ else
   fi
 fi
 
-dnl
-dnl Find an MD5 implementation.  Since Wget rarely needs MD5, we try
-dnl to use an existing library implementation to save on code size.
-dnl
-
-if test x"$wget_need_md5" = xyes
-then
-  dnl This should be moved to an AC_DEFUN, but I'm not sure how to
-  dnl manipulate MD5_OBJ from the defun.
-
-  AC_LIBOBJ([gen-md5])
-  found_md5=no
-
-  dnl Check for the system MD5 library on Solaris.  We don't check for
-  dnl something simple like "MD5Update" because there are a number of
-  dnl MD5 implementations that use that name, but have an otherwise
-  dnl incompatible interface.  md5_calc is, hopefully, specific to the
-  dnl Solaris MD5 library.
-  if test x"$found_md5" = xno; then
-    AC_CHECK_LIB(md5, md5_calc, [
-      dnl Some installations have bogus <md5.h> in the compiler's
-      dnl include path, making the system md5 library useless.
-      AC_MSG_CHECKING([for working md5.h])
-      AC_COMPILE_IFELSE([#include <md5.h>
-                        ], [
-        AC_MSG_RESULT(yes)
-        AC_DEFINE([HAVE_SOLARIS_MD5], 1, [Define when using Solaris MD5.])
-        LIBS="-lmd5 $LIBS"
-        found_md5=yes
-        AC_MSG_NOTICE([using the Solaris MD5 implementation])
-      ], [AC_MSG_RESULT(no)])
-    ])
-  fi
-
-  dnl Then see if we're linking OpenSSL anyway; if yes, use its md5
-  dnl implementation.
-  if test x"$found_md5" = xno; then
-    if test x"$LIBSSL" != x; then
-      AC_DEFINE([HAVE_OPENSSL_MD5], 1, [Define when using OpenSSL MD5.])
-      found_md5=yes
-      AC_MSG_NOTICE([using the OpenSSL MD5 implementation])
-    fi
-  fi
-
-  dnl If none of the above worked, use the one we ship with Wget.
-  if test x"$found_md5" = xno; then
-    AC_DEFINE([HAVE_BUILTIN_MD5], 1, [Define when using built-in MD5.])
-    found_md5=yes
-    AC_MSG_NOTICE([using the built-in (GNU) MD5 implementation])
-    AC_C_BIGENDIAN
-
-    AC_SUBST(MD5_CPPFLAGS, '-I $(top_srcdir)/md5')
-    AC_SUBST(MD5_LDADD, '../md5/libmd5.a')
-    AC_SUBST(MD5_SUBDIR, md5)
-    md5_INIT
-  fi
-  AC_DEFINE([HAVE_MD5], 1, [Define if we're compiling support for MD5.])
-fi
-
 dnl **********************************************************************
 dnl Checks for IPv6
 dnl **********************************************************************
 
 dnl
 dnl We test for IPv6 by checking, in turn, for availability of
-dnl getaddrinfo, presence of the INET6 address/protocol family, and
-dnl the existence of struct sockaddr_in6.  If any of them is missing,
-dnl IPv6 is disabled, and the code reverts to old-style gethostbyname.
+dnl presence of the INET6 address/protocol family and the existence of
+dnl struct sockaddr_in6.  If any of them is missing, IPv6 is disabled,
+dnl and the code reverts to old-style gethostbyname.
 dnl
 dnl If --enable-ipv6 is explicitly specified on the configure command
 dnl line, we check for IPv6 and abort if not found.  If --disable-ipv6
@@ -397,13 +382,6 @@ AC_ARG_ENABLE(ipv6,
 )
 
 if test "X$ipv6" = "Xyes"; then
-  AC_CHECK_FUNCS(getaddrinfo, [], [
-    AC_MSG_NOTICE([Disabling IPv6 support: your system does not support getaddrinfo(3)])
-    ipv6=no
-  ])
-fi
-
-if test "X$ipv6" = "Xyes"; then
   PROTO_INET6([], [
     AC_MSG_NOTICE([Disabling IPv6 support: your system does not support the PF_INET6 protocol family])
     ipv6=no
@@ -427,17 +405,6 @@ if test "X$ipv6" = "Xyes"; then
 elif test "x$force_ipv6" = "xyes"; then
   AC_MSG_ERROR([IPv6 support requested but not found; aborting])
 fi
-
-
-dnl
-dnl Set of available languages.
-dnl
-dnl Originally this used to be static, looking like this:
-dnl     ALL_LINGUAS="cs de hr it ..."
-dnl The downside was that configure needed to be rebuilt whenever a
-dnl new language was added.
-dnl
-ALL_LINGUAS="en@quot en@boldquot en_US $(cd ${srcdir}/po && ls *.po | grep -v 'en@.*quot' | grep -v 'en_US\.po' | sed -e 's/\.po$//' | tr '\012' ' ')"
 
 dnl
 dnl Find makeinfo.  We used to provide support for Emacs processing
@@ -554,6 +521,6 @@ dnl Create output
 dnl
 AC_CONFIG_FILES([Makefile src/Makefile doc/Makefile util/Makefile
                  po/Makefile.in tests/Makefile tests/WgetTest.pm
-                 lib/Makefile md5/Makefile windows/Makefile])
+                 lib/Makefile])
 AC_CONFIG_HEADERS([src/config.h])
 AC_OUTPUT

@@ -1,6 +1,7 @@
 /* File Transfer Protocol support.
-   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003,
-   2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
+   2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation,
+   Inc.
 
 This file is part of GNU Wget.
 
@@ -34,9 +35,7 @@ as that of the covered work.  */
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
-#ifdef HAVE_UNISTD_H
-# include <unistd.h>
-#endif
+#include <unistd.h>
 #include <assert.h>
 #include <errno.h>
 #include <time.h>
@@ -241,7 +240,7 @@ static uerr_t ftp_get_listing (struct url *, ccon *, struct fileinfo **);
    and closes the control connection in case of error.  */
 static uerr_t
 getftp (struct url *u, wgint passed_expected_bytes, wgint *qtyread,
-        wgint restval, ccon *con)
+        wgint restval, ccon *con, int count)
 {
   int csock, dtsock, local_sock, res;
   uerr_t err = RETROK;          /* appease the compiler */
@@ -252,6 +251,7 @@ getftp (struct url *u, wgint passed_expected_bytes, wgint *qtyread,
   int cmd = con->cmd;
   bool pasv_mode_open = false;
   wgint expected_bytes = 0;
+  bool got_expected_bytes = false;
   bool rest_failed = false;
   int flags;
   wgint rd_size;
@@ -301,10 +301,20 @@ getftp (struct url *u, wgint passed_expected_bytes, wgint *qtyread,
 
       csock = connect_to_host (host, port);
       if (csock == E_HOST)
-        return HOSTERR;
+        {
+          if (con->proxy)
+            xfree (logname);
+
+          return HOSTERR;
+        }
       else if (csock < 0)
-        return (retryable_socket_connect_error (errno)
-                ? CONERROR : CONIMPOSSIBLE);
+        {
+          if (con->proxy)
+            xfree (logname);
+
+          return (retryable_socket_connect_error (errno)
+                  ? CONERROR : CONIMPOSSIBLE);
+        }
 
       if (cmd & LEAVE_PENDING)
         con->csock = csock;
@@ -502,10 +512,10 @@ Error in server response, closing control connection.\n"));
         logputs (LOG_VERBOSE, _("==> CWD not needed.\n"));
       else
         {
-          char *targ;
-	  int cwd_count;
-	  int cwd_end;
-	  int cwd_start;
+          char *targ = NULL;
+          int cwd_count;
+          int cwd_end;
+          int cwd_start;
 
           char *target = u->dir;
 
@@ -690,7 +700,7 @@ Error in server response, closing control connection.\n"));
           if (!opt.server_response)
             logprintf (LOG_VERBOSE, "==> CWD (%d) %s ... ", cwd_count,
                        quotearg_style (escape_quoting_style, target));
-          err = ftp_cwd (csock, target);
+          err = ftp_cwd (csock, targ);
           /* FTPRERR, WRITEFAILED, FTPNSFOD */
           switch (err)
             {
@@ -755,6 +765,7 @@ Error in server response, closing control connection.\n"));
           con->csock = -1;
           return err;
         case FTPOK:
+          got_expected_bytes = true;
           /* Everything is OK.  */
           break;
         default:
@@ -763,6 +774,16 @@ Error in server response, closing control connection.\n"));
         if (!opt.server_response)
           logprintf (LOG_VERBOSE, expected_bytes ? "%s\n" : _("done.\n"),
                      number_to_static_string (expected_bytes));
+    }
+
+  if (cmd & DO_RETR && restval > 0 && restval == expected_bytes)
+    {
+      /* Server confirms that file has length restval. We should stop now.
+         Some servers (f.e. NcFTPd) return error when receive REST 0 */
+      logputs (LOG_VERBOSE, _("File has already been retrieved.\n"));
+      fd_close (csock);
+      con->csock = -1;
+      return RETRFINISHED;
     }
 
   /* If anything is to be retrieved, PORT (or PASV) must be sent.  */
@@ -1019,7 +1040,9 @@ Error in server response, closing control connection.\n"));
 
       if (!opt.server_response)
         logputs (LOG_VERBOSE, _("done.\n"));
-      expected_bytes = ftp_expected_bytes (ftp_last_respline);
+
+      if (! got_expected_bytes)
+        expected_bytes = ftp_expected_bytes (ftp_last_respline);
     } /* do retrieve */
 
   if (cmd & DO_LIST)
@@ -1065,7 +1088,9 @@ Error in server response, closing control connection.\n"));
         }
       if (!opt.server_response)
         logputs (LOG_VERBOSE, _("done.\n"));
-      expected_bytes = ftp_expected_bytes (ftp_last_respline);
+
+      if (! got_expected_bytes)
+        expected_bytes = ftp_expected_bytes (ftp_last_respline);
     } /* cmd & DO_LIST */
 
   if (!(cmd & (DO_LIST | DO_RETR)) || (opt.spider && !(cmd & DO_LIST)))
@@ -1156,8 +1181,23 @@ Error in server response, closing control connection.\n"));
 #endif /* def __VMS [else] */
         }
       else if (opt.noclobber || opt.always_rest || opt.timestamping || opt.dirstruct
-               || opt.output_document)
-        {
+               || opt.output_document || count > 0)
+        {	  
+	  if (opt.unlink && file_exists_p (con->target))
+	    {
+	      int res = unlink (con->target);
+	      if (res < 0)
+		{
+		  logprintf (LOG_NOTQUIET, "%s: %s\n", con->target,
+			     strerror (errno));
+		  fd_close (csock);
+		  con->csock = -1;
+		  fd_close (dtsock);
+		  fd_close (local_sock);
+		  return UNLINKERR;
+		}
+	    }
+
 #ifdef __VMS
           int open_id;
 
@@ -1348,7 +1388,7 @@ Error in server response, closing control connection.\n"));
    This loop either gets commands from con, or (if ON_YOUR_OWN is
    set), makes them up to retrieve the file given by the URL.  */
 static uerr_t
-ftp_loop_internal (struct url *u, struct fileinfo *f, ccon *con)
+ftp_loop_internal (struct url *u, struct fileinfo *f, ccon *con, char **local_file)
 {
   int count, orig_lp;
   wgint restval, len = 0, qtyread = 0;
@@ -1366,7 +1406,7 @@ ftp_loop_internal (struct url *u, struct fileinfo *f, ccon *con)
   else
     {
       /* URL-derived file.  Consider "-O file" name. */
-      con->target = url_file_name (u);
+      con->target = url_file_name (u, NULL);
       if (!opt.output_document)
         locf = con->target;
       else
@@ -1453,11 +1493,11 @@ ftp_loop_internal (struct url *u, struct fileinfo *f, ccon *con)
           xfree (hurl);
         }
       /* Send getftp the proper length, if fileinfo was provided.  */
-      if (f)
+      if (f && f->type != FT_SYMLINK)
         len = f->size;
       else
         len = 0;
-      err = getftp (u, len, &qtyread, restval, con);
+      err = getftp (u, len, &qtyread, restval, con, count);
 
       if (con->csock == -1)
         con->st &= ~DONE_CWD;
@@ -1468,6 +1508,7 @@ ftp_loop_internal (struct url *u, struct fileinfo *f, ccon *con)
         {
         case HOSTERR: case CONIMPOSSIBLE: case FWRITEERR: case FOPENERR:
         case FTPNSFOD: case FTPLOGINC: case FTPNOPASV: case CONTNOTSUPPORTED:
+        case UNLINKERR:
           /* Fatal errors, give up.  */
           return err;
         case CONSOCKERR: case CONERROR: case FTPSRVERR: case FTPRERR:
@@ -1480,7 +1521,7 @@ ftp_loop_internal (struct url *u, struct fileinfo *f, ccon *con)
             {
               /* Re-determine the file name. */
               xfree_null (con->target);
-              con->target = url_file_name (u);
+              con->target = url_file_name (u, NULL);
               locf = con->target;
             }
           continue;
@@ -1561,7 +1602,7 @@ ftp_loop_internal (struct url *u, struct fileinfo *f, ccon *con)
           total_downloaded_bytes += qtyread;
           numurls++;
 
-          if (opt.delete_after)
+          if (opt.delete_after && !input_file_url (opt.input_filename))
             {
               DEBUGP (("\
 Removing file due to --delete-after in ftp_loop_internal():\n"));
@@ -1576,6 +1617,10 @@ Removing file due to --delete-after in ftp_loop_internal():\n"));
         con->cmd |= LEAVE_PENDING;
       else
         con->cmd &= ~LEAVE_PENDING;
+
+      if (local_file)
+        *local_file = xstrdup (locf);
+
       return RETROK;
     } while (!opt.ntry || (count < opt.ntry));
 
@@ -1604,14 +1649,14 @@ ftp_get_listing (struct url *u, ccon *con, struct fileinfo **f)
   /* Find the listing file name.  We do it by taking the file name of
      the URL and replacing the last component with the listing file
      name.  */
-  uf = url_file_name (u);
+  uf = url_file_name (u, NULL);
   lf = file_merge (uf, LIST_FILENAME);
   xfree (uf);
   DEBUGP ((_("Using %s as listing tmp file.\n"), quote (lf)));
 
   con->target = xstrdup (lf);
   xfree (lf);
-  err = ftp_loop_internal (u, NULL, con);
+  err = ftp_loop_internal (u, NULL, con, NULL);
   lf = xstrdup (con->target);
   xfree (con->target);
   con->target = old_target;
@@ -1698,7 +1743,7 @@ ftp_retrieve_list (struct url *u, struct fileinfo *f, ccon *con)
       ofile = xstrdup (u->file);
       url_set_file (u, f->name);
 
-      con->target = url_file_name (u);
+      con->target = url_file_name (u, NULL);
       err = RETROK;
 
       dlthis = true;
@@ -1806,7 +1851,7 @@ Already have correct symlink %s -> %s\n\n"),
           else                /* opt.retr_symlinks */
             {
               if (dlthis)
-                err = ftp_loop_internal (u, f, con);
+                err = ftp_loop_internal (u, f, con, NULL);
             } /* opt.retr_symlinks */
           break;
         case FT_DIRECTORY:
@@ -1817,7 +1862,7 @@ Already have correct symlink %s -> %s\n\n"),
         case FT_PLAINFILE:
           /* Call the retrieve loop.  */
           if (dlthis)
-            err = ftp_loop_internal (u, f, con);
+            err = ftp_loop_internal (u, f, con, NULL);
           break;
         case FT_UNKNOWN:
           logprintf (LOG_NOTQUIET, _("%s: unknown/unsupported file type.\n"),
@@ -1849,7 +1894,8 @@ Already have correct symlink %s -> %s\n\n"),
          original.  :( */
       if (actual_target != NULL)
         {
-          if (!(f->type == FT_SYMLINK && !opt.retr_symlinks)
+          if (opt.useservertimestamps
+              && !(f->type == FT_SYMLINK && !opt.retr_symlinks)
               && f->tstamp != -1
               && dlthis
               && file_exists_p (con->target))
@@ -2079,7 +2125,7 @@ ftp_retrieve_glob (struct url *u, ccon *con, int action)
   if (start)
     {
       /* Just get everything.  */
-      ftp_retrieve_list (u, start, con);
+      res = ftp_retrieve_list (u, start, con);
     }
   else
     {
@@ -2095,7 +2141,7 @@ ftp_retrieve_glob (struct url *u, ccon *con, int action)
         {
           /* Let's try retrieving it anyway.  */
           con->st |= ON_YOUR_OWN;
-          res = ftp_loop_internal (u, NULL, con);
+          res = ftp_loop_internal (u, NULL, con, NULL);
           return res;
         }
 
@@ -2108,15 +2154,15 @@ ftp_retrieve_glob (struct url *u, ccon *con, int action)
   if (opt.quota && total_downloaded_bytes > opt.quota)
     return QUOTEXC;
   else
-    /* #### Should we return `res' here?  */
-    return RETROK;
+    return res;
 }
 
 /* The wrapper that calls an appropriate routine according to contents
    of URL.  Inherently, its capabilities are limited on what can be
    encoded into a URL.  */
 uerr_t
-ftp_loop (struct url *u, int *dt, struct url *proxy, bool recursive, bool glob)
+ftp_loop (struct url *u, char **local_file, int *dt, struct url *proxy,
+          bool recursive, bool glob)
 {
   ccon con;                     /* FTP connection */
   uerr_t res;
@@ -2146,7 +2192,7 @@ ftp_loop (struct url *u, int *dt, struct url *proxy, bool recursive, bool glob)
               char *filename = (opt.output_document
                                 ? xstrdup (opt.output_document)
                                 : (con.target ? xstrdup (con.target)
-                                   : url_file_name (u)));
+                                   : url_file_name (u, NULL)));
               res = ftp_index (filename, u, f);
               if (res == FTPOK && opt.verbose)
                 {
@@ -2195,7 +2241,7 @@ ftp_loop (struct url *u, int *dt, struct url *proxy, bool recursive, bool glob)
                                    ispattern ? GLOB_GLOBALL : GLOB_GETONE);
         }
       else
-        res = ftp_loop_internal (u, NULL, &con);
+        res = ftp_loop_internal (u, NULL, &con, local_file);
     }
   if (res == FTPOK)
     res = RETROK;

@@ -1,6 +1,6 @@
 /* Support for Robot Exclusion Standard (RES).
-   Copyright (C) 2001, 2006, 2007, 2008, 2009 Free Software Foundation,
-   Inc.
+   Copyright (C) 2001, 2006, 2007, 2008, 2009, 2010, 2011 Free Software
+   Foundation, Inc.
 
 This file is part of Wget.
 
@@ -283,7 +283,7 @@ res_parse (const char *source, int length)
       SKIP_SPACE (p);
       if (field_b == field_e || EOL (p) || *p != ':')
         {
-          DEBUGP (("Ignoring malformed line %d", line_count));
+          DEBUGP (("Ignoring malformed line %d\n", line_count));
           goto next;
         }
       ++p;                      /* skip ':' */
@@ -351,7 +351,7 @@ res_parse (const char *source, int length)
         }
       else
         {
-          DEBUGP (("Ignoring unknown field at line %d", line_count));
+          DEBUGP (("Ignoring unknown field at line %d\n", line_count));
           goto next;
         }
 
@@ -385,7 +385,7 @@ struct robot_specs *
 res_parse_from_file (const char *filename)
 {
   struct robot_specs *specs;
-  struct file_memory *fm = read_file (filename);
+  struct file_memory *fm = wget_read_file (filename);
   if (!fm)
     {
       logprintf (LOG_NOTQUIET, _("Cannot open %s: %s"),
@@ -393,7 +393,7 @@ res_parse_from_file (const char *filename)
       return NULL;
     }
   specs = res_parse (fm->content, fm->length);
-  read_file_free (fm);
+  wget_read_file_free (fm);
   return specs;
 }
 
@@ -552,7 +552,7 @@ res_retrieve_file (const char *url, char **file, struct iri *iri)
   opt.timestamping = false;
   opt.spider       = false;
 
-  url_parsed = url_parse (robots_url, &url_err, iri, true);
+  url_parsed = url_parse (robots_url, &url_err, i, true);
   if (!url_parsed)
     {
       char *error = url_error (robots_url, url_err);

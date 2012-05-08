@@ -1,6 +1,7 @@
 /* Command line parsing.
-   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003,
-   2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
+   2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation,
+   Inc.
 
    This file is part of GNU Wget.
 
@@ -59,6 +60,7 @@ get_status_for_err (uerr_t err)
     case RETROK:
       return WGET_EXIT_SUCCESS;
     case FOPENERR: case FOPEN_EXCL_ERR: case FWRITEERR: case WRITEFAILED:
+    case UNLINKERR:
       return WGET_EXIT_IO_FAIL;
     case NOCONERROR: case HOSTERR: case CONSOCKERR: case CONERROR:
     case CONSSLERR: case CONIMPOSSIBLE: case FTPRERR: case FTPINVPASV:

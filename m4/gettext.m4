@@ -1,6 +1,5 @@
 # gettext.m4 serial 60 (gettext-0.17)
-dnl Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003,
-dnl 2004, 2005, 2006, 2007, 2009 Free Software Foundation, Inc.
+dnl Copyright (C) 1995-2007 Free Software Foundation, Inc.
 dnl This file is free software; the Free Software Foundation
 dnl gives unlimited permission to copy and/or distribute it,
 dnl with or without modifications, as long as this notice is preserved.
@@ -380,3 +379,4 @@ AC_DEFUN([AM_GNU_GETTEXT_NEED],
 
 dnl Usage: AM_GNU_GETTEXT_VERSION([gettext-version])
 AC_DEFUN([AM_GNU_GETTEXT_VERSION], [])
+              AC_DEFUN([gl_LOCK_EARLY], [])

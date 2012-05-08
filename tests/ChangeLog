@@ -1,8 +1,164 @@
+2011-06-03  Merinov Nikolay  <kim.roader@gmail.com>
+
+	* Test-idn-cmd-utf8.px: Added test for idn with utf-8 local encoding.
+	* Test-idn-robots-utf8.px: Added test for idn with utf-8 local encoding
+	and robots.txt file.
+	* Makefile.am, run-px: Add new tests.
+2011-04-19  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* Makefile.am (LIBS): Add $(LIB_CLOCK_GETTIME).
+
+2011-04-04  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* Makefile.am (LIBS): Remove  @LIBSSL@ @W32LIBS@
+
+2010-10-23  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* Makefile.am (LIBS): Remove @LIBGNUTLS@ and use @W32LIBS@ as last
+	component.
+
+2010-09-12  Mike Frysinger  <vapier@gentoo.org>
+
+	Fix some tests failures.
+	* Test-iri-forced-remote.px: Use --trust-server-names to the cmdline
+	variable.
+	* Test-iri-list.px: Likewise.
+	* Test-iri.px: Likewise.
+
+2010-06-04  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* Test--no-content-disposition-trivial.px: Use /usr/bin/env to find the
+	perl interpreter.
+	* Test--no-content-disposition.px: Likewise.
+	* Test--spider-fail.px: Likewise.
+	* Test--spider-r--no-content-disposition-trivial.px: Likewise.
+	* Test--spider-r--no-content-disposition.px: Likewise.
+	* Test--spider-r-HTTP-Content-Disposition.px: Likewise.
+	* Test--spider-r.px: Likewise.
+	* Test--spider.px: Likewise.
+	* Test-E-k-K.px: Likewise.
+	* Test-E-k.px: Likewise.
+	* Test-HTTP-Content-Disposition-1.px: Likewise.
+	* Test-HTTP-Content-Disposition-2.px: Likewise.
+	* Test-HTTP-Content-Disposition.px: Likewise.
+	* Test-N--no-content-disposition-trivial.px: Likewise.
+	* Test-N--no-content-disposition.px: Likewise.
+	* Test-N-HTTP-Content-Disposition.px: Likewise.
+	* Test-N-current.px: Likewise.
+	* Test-N-no-info.px: Likewise.
+	* Test-N-old.px: Likewise.
+	* Test-N-smaller.px: Likewise.
+	* Test-N.px: Likewise.
+	* Test-O--no-content-disposition-trivial.px: Likewise.
+	* Test-O--no-content-disposition.px: Likewise.
+	* Test-O-HTTP-Content-Disposition.px: Likewise.
+	* Test-O-nc.px: Likewise.
+	* Test-O-nonexisting.px: Likewise.
+	* Test-O.px: Likewise.
+	* Test-Restrict-Lowercase.px: Likewise.
+	* Test-Restrict-Uppercase.px: Likewise.
+	* Test-auth-basic.px: Likewise.
+	* Test-auth-no-challenge-url.px: Likewise.
+	* Test-auth-no-challenge.px: Likewise.
+	* Test-auth-retcode.px: Likewise.
+	* Test-auth-with-content-disposition.px: Likewise.
+	* Test-c-full.px: Likewise.
+	* Test-c-partial.px: Likewise.
+	* Test-c-shorter.px: Likewise.
+	* Test-c.px: Likewise.
+	* Test-cookies-401.px: Likewise.
+	* Test-cookies.px: Likewise.
+	* Test-ftp-bad-list.px: Likewise.
+	* Test-ftp-iri-disabled.px: Likewise.
+	* Test-ftp-iri-fallback.px: Likewise.
+	* Test-ftp-iri-recursive.px: Likewise.
+	* Test-ftp-iri.px: Likewise.
+	* Test-ftp-pasv-fail.px: Likewise.
+	* Test-ftp-recursive.px: Likewise.
+	* Test-ftp.px: Likewise.
+	* Test-i-ftp.px: Likewise.
+	* Test-i-http.px: Likewise.
+	* Test-idn-cmd.px: Likewise.
+	* Test-idn-headers.px: Likewise.
+	* Test-idn-meta.px: Likewise.
+	* Test-idn-robots.px: Likewise.
+	* Test-iri-disabled.px: Likewise.
+	* Test-iri-forced-remote.px: Likewise.
+	* Test-iri-list.px: Likewise.
+	* Test-iri-percent.px: Likewise.
+	* Test-iri.px: Likewise.
+	* Test-k.px: Likewise.
+	* Test-meta-robots.px: Likewise.
+	* Test-nonexisting-quiet.px: Likewise.
+	* Test-noop.px: Likewise.
+	* Test-np.px: Likewise.
+	* Test-proxied-https-auth.px: Likewise.
+	* Test-proxy-auth-basic.px: Likewise.
+	* Test-restrict-ascii.px: Likewise.
+	Reported by sci-fi@hush.ai.
+
+2010-05-29  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* Makefile.am (EXTRA_DIST): Add Test-auth-retcode.px.
+
+	* run-px (tests): Likewise.
+
+	* Test-auth-retcode.px: New file.
+
+2010-05-16  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* Makefile.am (../md5/libmd5.a): Remove rule.
+	(LDADD):  Remove MD5_LDADD.
+
+2010-05-08  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* Makefile.am: Update copyright years.
+
+2010-05-07  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* Makefile.am (LIBS): Add definition.
+	(LDADD): Add LIBS.
+
+2010-03-01  Steven Schubiger  <stsc@member.fsf.org>
+
+	* Test-i-ftp.px: Test --input-file in conjunction with FTP.
+	* run-px, Makefile.am (EXTRA_DIST): Added Test-i-ftp.px.
+
+2010-02-26  Steven Schubiger  <stsc@member.fsf.org>
+
+	* Test-i-http.px: Test --input-file in conjunction with HTTP.
+	* run-px, Makefile.am (EXTRA_DIST): Added Test-i-http.px.
+
+2010-02-25  Steven Schubiger  <stsc@member.fsf.org>
+
+	* FTPServer.pm (FTPServer::new): Substitute port placeholders
+	in content of files to be retrieved via FTP.
+
+2009-10-14  Steven Schubiger  <stsc@member.fsf.org>
+
+	* Test-E-k-K.px, Test-cookies-401.px, Test-ftp-bad-list.px,
+	Test-iri-list.px, Test-iri.px: Removed -d from invocation.
+	Patch by Mike Frysinger.
+
+2009-09-27  Micah Cowan  <micah@cowan.name>
+
+	* Test-idn-cmd.px, Test-idn-headers.px, Test-idn-meta.px,
+	Test-idn-robots.px, Test-proxy-auth-basic.px: Removed --debug from
+	invocation (in case it wasn't built with --debug support).
+
+2009-09-24  Micah Cowan  <micah@cowan.name>
+
+	* Test-ftp-iri-disabled.px: Fix name "Test-ftp-iri" ->
+	"test-ftp-iri-disabled"
+
+	* Test-ftp-iri-fallback.px: Fix name "Test-ftp-iri" ->
+	"test-ftp-iri-fallback"
+
 2009-09-07  Micah Cowan  <micah@cowan.name>
 
 	* run-px: Exit with a failure if there were any tests with
 	"unknown" exit statuses.
-	
+
 	* Test-auth-with-content-disposition.px: New. Test Content-Disposition
 	support when HTTP authentication is required.
 	* run-px, Makefile.am (EXTRA_DIST): Added
@@ -105,7 +261,7 @@
 2009-08-27  Micah Cowan  <micah@cowan.name>
 
 	* WgetTest.pm.in (run): Shift the errcode right by 8 binary places.
-	
+
 	* Test--spider-fail.px, Test--spider-r--no-content-disposition.px,
 	Test--spider-r--no-content-disposition-trivial.px,
 	Test--spider-r-HTTP-Content-Disposition.px, Test--spider-r.px,
@@ -140,7 +296,7 @@
 	Test-ftp-iri-recursive.px, Test-ftp-iri-disabled.px,
 	Test-idn-cmd.px, Test-idn-robots.px: Adjust wget invocations,
 	replacing --locale with --local-encoding.
-	
+
 2009-07-07  Steven Schubiger  <stsc@member.fsf.org>
 
 	* Makefile.am: Add IDN/IRI test files and Test-meta-robots.px
@@ -149,7 +305,7 @@
 2009-07-05  Micah Cowan  <micah@cowan.name>
 
 	* Test-meta-robots.px: Added.
-	
+
 	* run-px: Add Test-meta-robots.px to the list.
 
 2009-07-03  Micah Cowan  <micah@cowan.name>
@@ -307,7 +463,7 @@
 	path (made necessary by the accompanying change to HTTPServer.pm).
 
 2008-08-14  Xavier Saint <wget@sxav.eu>
-	
+
 	* Test-iri-list.px : Fetch files from a remote list.
 
 2008-08-03  Xavier Saint <wget@sxav.eu>
@@ -406,7 +562,7 @@
 
 	* Makefile.am (run-px-tests): Replaced ugly list of tests with
 	run-px Perl script to manage running them.
-	
+
 	* run-px: Added.
 
 	* FTPServer.pm (run): Avoid re-forking. Fixes bug #20458.
@@ -542,7 +698,7 @@
 	* Test-np.px: Added test for -np.
 
 	* HTTPTest.pm: Ignore initial '/' character in requested URLs.
-	
+
 2006-10-12  Mauro Tortonesi  <mauro@ferrara.linux.it>
 
 	* Test1.px: Renamed to Test-noop.px.
@@ -562,13 +718,13 @@
 	* Test-O-nonexisting.px: Ditto.
 
 	* Test5.px: Renamed to Test-HTTP-Content-Disposition.px.
-	
+
 	* Test-HTTP-Content-Disposition.px: Ditto.
-	
+
 	* Test6.px: Renamed to Test-HTTP-Content-Disposition-1.px.
-	
+
 	* Test-HTTP-Content-Disposition-1.px: Ditto.
-	
+
 	* Test7.px: Renamed to Test-HTTP-Content-Disposition-2.px.
 
 	* Test-HTTP-Content-Disposition-2.px: Ditto.
@@ -580,13 +736,13 @@
 	* Test-Restrict-Lowercase.px: Ditto.
 
 	* Test10.px: Renamed to Test-Restrict-Uppercase.px.
-	
+
 	* Test-Restrict-Uppercase.px: Ditto.
 
 	* Test--spider.px: Added test for spider mode.
-	
+
 	* Test--spider-fail.px: Added failing test for spider mode.
-	
+
 	* Test--spider-r.px: Added test for recursive spider mode.
 
 	* Test-c.px: Added test for --continue mode.
@@ -598,7 +754,7 @@
 	* Test-O.px: Added test for -O.
 
 	* Test-N-current.px: Added test for -N.
-	
+
 	* Test-N-old.px: Added test for -N.
 
 	* Test-E-k.px: Added test for -E -k.
@@ -616,7 +772,7 @@
 2006-06-13  Mauro Tortonesi  <mauro@ferrara.linux.it>
 
 	* Test9.px: Added test for --restrict-file-names=lowercase option.
-	
+
 	* Test10.px: Added test for --restrict-file-names=uppercase option.
 
 2006-05-26  Mauro Tortonesi  <mauro@ferrara.linux.it>
@@ -631,9 +787,9 @@
 	* Test1.px: Removed unneeded ../src/ from command line.
 
 	* Test2.px: Ditto.
-	
+
 	* Test3.px: Ditto.
-	
+
 	* Test4.px: Ditto.
 
 	* Test5.px: Ditto.
@@ -656,24 +812,24 @@
 	* Test5.px: Added test for HTTP Content-Disposition support.
 
 	* Test6.px: Ditto.
-	
+
 	* Test7.px: Ditto.
 
 2006-04-27  Mauro Tortonesi  <mauro@ferrara.linux.it>
-	
+
 	* HTTPServer.pm: Serve index.html if no filename is given.
 
 	* Test.pm: Added support for pre-existing files.
-	
+
 2006-01-24  Mauro Tortonesi  <mauro@ferrara.linux.it>
 
 	* HTTPServer.pm: Enhanced logging support.
 
 	* HTTPTest.pm: Updated to new test format.
-	
+
 	* Test.pm: Improved test setup, verification and cleanup. Major
 	refactoring.
-	
+
 	* Test1.px: Updated to new test format.
 
 	* Test2.px: Updated to new test format.
@@ -682,15 +838,15 @@
 
 	* Test4.px: Added new test for quiet download of nonexistent URL with
 	--output-document option.
-	
+
 2005-12-05  Mauro Tortonesi  <mauro@ferrara.linux.it>
 
 	* HTTPServer.pm: Refactored as a subclass of HTTP::Daemon.
 	Removed the old run method and renamed the old run_daemon
 	method to run.  Added support for partial
-	
+
 	* Testing.pm: Renamed to HTTPTest.pm.
-	
+
 	* HTTPTest.pm: Refactored as a subclass of Test.  Renamed
 	Run_HTTP_Test to run, verify_download to _verify_download
 	and added support for timestamp checking.
@@ -699,15 +855,15 @@
 	testcase.
 
 	* test1: Renamed to Test1.px.
-	
+
 	* Test1.px: Refactored as an instance of the HTTPTest class.
-	
+
 	* Test2.px: Added -N HTTP test.
 
 2005-11-02  Mauro Tortonesi  <mauro@ferrara.linux.it>
 
 	* HTTPServer.pm: Added basic support for HTTP testing.
-	
+
 	* Testing.pm: Added basic support for feature testing (only HTTP
 	testing is supported at the moment).
 

@@ -31,7 +31,8 @@ data.
 
 @c man begin COPYRIGHT
 Copyright @copyright{} 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003,
-2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation,
+Inc.
 
 @iftex
 Permission is granted to make and distribute verbatim copies of
@@ -63,7 +64,6 @@ Documentation License''.
 @ignore
 @c man begin AUTHOR
 Originally written by Hrvoje Niksic <hniksic@xemacs.org>.
-Currently maintained by Micah Cowan <micah@cowan.name>.
 @c man end
 @c man begin SEEALSO
 This is @strong{not} the complete manual for GNU Wget.
@@ -190,7 +190,9 @@ gauge can be customized to your preferences.
 Most of the features are fully configurable, either through command line
 options, or via the initialization file @file{.wgetrc} (@pxref{Startup
 File}).  Wget allows you to define @dfn{global} startup files
-(@file{/usr/local/etc/wgetrc} by default) for site settings.
+(@file{/usr/local/etc/wgetrc} by default) for site settings. You can also
+specify the location of a startup file with the --config option.
+ 
 
 @ignore
 @c man begin FILES
@@ -524,6 +526,10 @@ presence of a @code{BASE} tag in the @sc{html} input file, with
 For instance, if you specify @samp{http://foo/bar/a.html} for
 @var{URL}, and Wget reads @samp{../baz/b.html} from the input file, it
 would be resolved to @samp{http://foo/baz/b.html}.
+
+@cindex specify config 
+@item --config=@var{FILE}
+Specify the location of a startup file you wish to use.
 @end table
 
 @node Download Options, Directory Options, Logging and Input File Options, Invoking
@@ -579,7 +585,8 @@ some cases where this behavior can actually have some use.
 Note that a combination with @samp{-k} is only permitted when
 downloading a single document, as in that case it will just convert
 all relative URIs to external ones; @samp{-k} makes no sense for
-multiple URIs when they're all being downloaded to a single file.
+multiple URIs when they're all being downloaded to a single file;
+@samp{-k} can be used only when the output is a regular file.
 
 @cindex clobbering, file
 @cindex downloading multiple times
@@ -719,6 +726,16 @@ use @samp{--progress=bar:force}.
 @itemx --timestamping
 Turn on time-stamping.  @xref{Time-Stamping}, for details.
 
+@item --no-use-server-timestamps
+Don't set the local file's timestamp by the one on the server.
+
+By default, when a file is downloaded, it's timestamps are set to
+match those from the remote file. This allows the use of
+@samp{--timestamping} on subsequent invocations of wget. However, it
+is sometimes useful to base the local file's timestamp on when it was
+actually downloaded; for that purpose, the
+@samp{--no-use-server-timestamps} option has been provided.
+
 @cindex server response, print
 @item -S
 @itemx --server-response
@@ -830,9 +847,7 @@ If you don't want Wget to wait between @emph{every} retrieval, but only
 between retries of failed downloads, you can use this option.  Wget will
 use @dfn{linear backoff}, waiting 1 second after the first failure on a
 given file, then waiting 2 seconds after the second failure on that
-file, up to the maximum number of @var{seconds} you specify.  Therefore,
-a value of 10 will actually make Wget wait up to (1 + 2 + ... + 10) = 55
-seconds per file. 
+file, up to the maximum number of @var{seconds} you specify.
 
 By default, Wget will assume a value of 10 seconds.
 
@@ -1064,6 +1079,13 @@ header and in HTML @code{Content-Type http-equiv} meta tag.
 You can set the default encoding using the @code{remoteencoding}
 command in @file{.wgetrc}. That setting may be overridden from the
 command line.
+
+@cindex unlink
+@item --unlink
+
+Force Wget to unlink file instead of clobbering existing file. This
+option is useful for downloading to the directory with hardlinks.
+
 @end table
 
 @node Directory Options, HTTP Options, Download Options, Invoking
@@ -1166,10 +1188,7 @@ Note that filenames changed in this way will be re-downloaded every time
 you re-mirror a site, because Wget can't tell that the local
 @file{@var{X}.html} file corresponds to remote URL @samp{@var{X}} (since
 it doesn't yet know that the URL produces output of type
-@samp{text/html} or @samp{application/xhtml+xml}.  To prevent this 
-re-downloading, you must use @samp{-k} and @samp{-K} so that the original 
-version of the file will be saved as @file{@var{X}.orig} (@pxref{Recursive 
-Retrieval Options}).
+@samp{text/html} or @samp{application/xhtml+xml}.
 
 As of version 1.12, Wget will also ensure that any downloaded files of
 type @samp{text/css} end in the suffix @samp{.css}, and the option was
@@ -1426,7 +1445,7 @@ data, whereas @samp{--post-file} sends the contents of @var{file}.
 Other than that, they work in exactly the same way. In particular,
 they @emph{both} expect content of the form @code{key1=value1&key2=value2},
 with percent-encoding for special characters; the only difference is
-that one expects its content as a command-line paramter and the other
+that one expects its content as a command-line parameter and the other
 accepts its content from a file. In particular, @samp{--post-file} is
 @emph{not} for transmitting files as form attachments: those must
 appear as @code{key=value} data (with appropriate percent-coding) just
@@ -1486,6 +1505,13 @@ to suffer from a few bugs, which is why it is not currently enabled by default.
 This option is useful for some file-downloading CGI programs that use
 @code{Content-Disposition} headers to describe what the name of a
 downloaded file should be.
+
+@cindex Trust server names
+@item --trust-server-names
+
+If this is set to on, on a redirect the last component of the
+redirection URL will be used as the local file name.  By default it is
+used the last component in the original URL.
 
 @cindex authentication
 @item --auth-no-challenge
@@ -1738,12 +1764,12 @@ case.
 @item -r
 @itemx --recursive
 Turn on recursive retrieving.  @xref{Recursive Download}, for more
-details.
+details.  The default maximum depth is 5.
 
 @item -l @var{depth}
 @itemx --level=@var{depth}
 Specify recursion maximum depth level @var{depth} (@pxref{Recursive
-Download}).  The default maximum depth is 5.
+Download}).
 
 @cindex proxy filling
 @cindex delete after retrieval
@@ -1954,7 +1980,7 @@ Set domains to be followed.  @var{domain-list} is a comma-separated list
 of domains.  Note that it does @emph{not} turn on @samp{-H}.
 
 @item --exclude-domains @var{domain-list}
-Specify the domains that are @emph{not} to be followed.
+Specify the domains that are @emph{not} to be followed
 (@pxref{Spanning Hosts}).
 
 @cindex follow FTP links
@@ -2799,6 +2825,10 @@ Set the connect timeout---the same as @samp{--connect-timeout}.
 Turn on recognition of the (non-standard) @samp{Content-Disposition}
 HTTP header---if set to @samp{on}, the same as @samp{--content-disposition}.
 
+@item trust_server_names = on/off
+If set to on, use the last component of a redirection URL for the local
+file name.
+
 @item continue = on/off
 If set to on, force continuation of preexistent partially retrieved
 files.  See @samp{-c} before setting it.
@@ -3141,6 +3171,10 @@ as @samp{--secure-protocol=@var{string}}.
 Choose whether or not to print the @sc{http} and @sc{ftp} server
 responses---the same as @samp{-S}.
 
+@item show_all_dns_entries = on/off
+When a DNS name is resolved, show all the IP addresses, not just the first
+three.
+
 @item span_hosts = on/off
 Same as @samp{-H}.
 
@@ -3156,6 +3190,10 @@ Set all applicable timeout values to @var{n}, the same as @samp{-T
 
 @item timestamping = on/off
 Turn timestamping on/off.  The same as @samp{-N} (@pxref{Time-Stamping}).
+
+@item use_server_timestamps = on/off
+If set to @samp{off}, Wget won't set the local file's timestamp by the
+one on the server (same as @samp{--no-use-server-timestamps}).
 
 @item tries = @var{n}
 Set number of retries per @sc{url}---the same as @samp{-t @var{n}}.
@@ -3879,9 +3917,8 @@ me).
 GNU Wget was written by Hrvoje Nik@v{s}i@'{c} @email{hniksic@@xemacs.org},
 @end iftex
 @ifnottex
-GNU Wget was written by Hrvoje Niksic @email{hniksic@@xemacs.org},
+GNU Wget was written by Hrvoje Niksic @email{hniksic@@xemacs.org}.
 @end ifnottex
-and it is currently maintained by Micah Cowan @email{micah@@cowan.name}.
 
 However, the development of Wget could never have gone as far as it has, were
 it not for the help of many people, either with bug reports, feature proposals,

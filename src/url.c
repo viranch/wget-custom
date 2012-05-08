@@ -1,6 +1,7 @@
 /* URL handling.
    Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
-   2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation,
+   Inc.
 
 This file is part of GNU Wget.
 
@@ -33,9 +34,7 @@ as that of the covered work.  */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifdef HAVE_UNISTD_H
-# include <unistd.h>
-#endif
+#include <unistd.h>
 #include <errno.h>
 #include <assert.h>
 
@@ -463,6 +462,13 @@ url_has_scheme (const char *url)
   return *p == ':';
 }
 
+bool
+url_valid_scheme (const char *url)
+{
+  enum url_scheme scheme = url_scheme (url);
+  return scheme != SCHEME_INVALID;
+}
+
 int
 scheme_default_port (enum url_scheme scheme)
 {
@@ -624,7 +630,7 @@ init_seps (enum url_scheme scheme)
     *p++ = '?';
   if (flags & scm_has_fragment)
     *p++ = '#';
-  *p++ = '\0';
+  *p = '\0';
   return seps;
 }
 
@@ -1492,7 +1498,7 @@ append_dir_structure (const struct url *u, struct growable *dest)
    possible.  Does not create directories on the file system.  */
 
 char *
-url_file_name (const struct url *u)
+url_file_name (const struct url *u, char *replaced_filename)
 {
   struct growable fnres;        /* stands for "file name result" */
 
@@ -1547,18 +1553,29 @@ url_file_name (const struct url *u)
       append_dir_structure (u, &fnres);
     }
 
-  /* Add the file name. */
-  if (fnres.tail)
-    append_char ('/', &fnres);
-  u_file = *u->file ? u->file : index_filename;
-  append_uri_pathel (u_file, u_file + strlen (u_file), false, &fnres);
-
-  /* Append "?query" to the file name. */
-  u_query = u->query && *u->query ? u->query : NULL;
-  if (u_query)
+  if (!replaced_filename)
     {
-      append_char (FN_QUERY_SEP, &fnres);
-      append_uri_pathel (u_query, u_query + strlen (u_query), true, &fnres);
+      /* Add the file name. */
+      if (fnres.tail)
+	append_char ('/', &fnres);
+      u_file = *u->file ? u->file : index_filename;
+      append_uri_pathel (u_file, u_file + strlen (u_file), false, &fnres);
+
+      /* Append "?query" to the file name. */
+      u_query = u->query && *u->query ? u->query : NULL;
+      if (u_query)
+	{
+	  append_char (FN_QUERY_SEP, &fnres);
+	  append_uri_pathel (u_query, u_query + strlen (u_query),
+			     true, &fnres);
+	}
+    }
+  else
+    {
+      if (fnres.tail)
+	append_char ('/', &fnres);
+      u_file = replaced_filename;
+      append_uri_pathel (u_file, u_file + strlen (u_file), false, &fnres);
     }
 
   /* Zero-terminate the file name. */

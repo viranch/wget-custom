@@ -1,6 +1,6 @@
 # Makefile for `Wget' utility
-# Copyright (C) 1995, 1996, 1997, 2006, 2007,
-#   2008, 2009 Free Software Foundation, Inc.
+# Copyright (C) 1995, 1996, 1997, 2006, 2007, 2008, 2009, 2010, 2011
+# Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -38,14 +38,27 @@ distuninstallcheck_listfiles = find . -type f | \
 			       grep -Ev '(/share/info/dir|/etc/wgetrc)$$'
 
 # Search for macros in the m4 subdirectory:
-ACLOCAL_AMFLAGS = -I m4 -I md5/m4
+ACLOCAL_AMFLAGS = -I m4
 
 # subdirectories in the distribution
-SUBDIRS = lib md5 src doc po tests util windows
+SUBDIRS = lib src doc po tests util
 
-EXTRA_DIST = ChangeLog.README configure.bat MAILING-LIST \
+EXTRA_DIST = ChangeLog.README MAILING-LIST \
              msdos/ChangeLog msdos/config.h msdos/Makefile.DJ \
-             msdos/Makefile.WC ABOUT-NLS autogen.sh \
-             build-aux/build_info.pl
+             msdos/Makefile.WC ABOUT-NLS \
+             build-aux/build_info.pl .version
 
 CLEANFILES = *~ *.bak $(DISTNAME).tar.gz
+
+BUILT_SOURCES = .version
+
+clean-generic:
+	rm -f install-info
+
+.version:
+	echo $(VERSION) > $@-t && mv $@-t $@
+
+# Arrange so that .tarball-version appears only in the distribution
+# tarball, and never in a checked-out repository.
+dist-hook:
+	$(AM_V_GEN)echo $(VERSION) > $(distdir)/.tarball-version

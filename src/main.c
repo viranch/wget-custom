@@ -1,6 +1,7 @@
 /* Command line parsing.
-   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003,
-   2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
+   2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation,
+   Inc.
 
 This file is part of GNU Wget.
 
@@ -32,9 +33,7 @@ as that of the covered work.  */
 
 #include <stdio.h>
 #include <stdlib.h>
-#ifdef HAVE_UNISTD_H
-# include <unistd.h>
-#endif /* HAVE_UNISTD_H */
+#include <unistd.h>
 #include <string.h>
 #include <signal.h>
 #ifdef ENABLE_NLS
@@ -55,17 +54,27 @@ as that of the covered work.  */
 #include "convert.h"
 #include "spider.h"
 #include "http.h"               /* for save_cookies */
+#include "ptimer.h"
 
 #include <getopt.h>
 #include <getpass.h>
 #include <quote.h>
 
+#ifdef WINDOWS
+# include <io.h>
+# include <fcntl.h>
+#endif
+
 #ifdef __VMS
-#include "vms.h"
+# include "vms.h"
 #endif /* __VMS */
 
 #ifndef PATH_SEPARATOR
 # define PATH_SEPARATOR '/'
+#endif
+
+#ifndef ENABLE_IRI
+struct iri dummy_iri;
 #endif
 
 struct options opt;
@@ -76,7 +85,7 @@ extern char *compilation_string;
 extern char *system_getrc;
 extern char *link_string;
 /* defined in build_info.c */
-extern char *compiled_features[];
+extern const char *compiled_features[];
 /* Used for --version output in print_version */
 #define MAX_CHARS_PER_LINE      72
 #define TABULATION              4
@@ -164,6 +173,7 @@ static struct cmdline_option option_data[] =
     { IF_SSL ("certificate-type"), 0, OPT_VALUE, "certificatetype", -1 },
     { IF_SSL ("check-certificate"), 0, OPT_BOOLEAN, "checkcertificate", -1 },
     { "clobber", 0, OPT__CLOBBER, NULL, optional_argument },
+    { "config", 0, OPT_VALUE, "chooseconfig", -1 },
     { "connect-timeout", 0, OPT_VALUE, "connecttimeout", -1 },
     { "continue", 'c', OPT_BOOLEAN, "continue", -1 },
     { "convert-links", 'k', OPT_BOOLEAN, "convertlinks", -1 },
@@ -266,6 +276,9 @@ static struct cmdline_option option_data[] =
     { "timeout", 'T', OPT_VALUE, "timeout", -1 },
     { "timestamping", 'N', OPT_BOOLEAN, "timestamping", -1 },
     { "tries", 't', OPT_VALUE, "tries", -1 },
+    { "unlink", 0, OPT_BOOLEAN, "unlink", -1 },
+    { "trust-server-names", 0, OPT_BOOLEAN, "trustservernames", -1 },
+    { "use-server-timestamps", 0, OPT_BOOLEAN, "useservertimestamps", -1 },
     { "user", 0, OPT_VALUE, "user", -1 },
     { "user-agent", 'U', OPT_VALUE, "useragent", -1 },
     { "verbose", 'v', OPT_BOOLEAN, "verbose", -1 },
@@ -380,10 +393,11 @@ init_switches (void)
 }
 
 /* Print the usage message.  */
-static void
-print_usage (void)
+static int
+print_usage (int error)
 {
-  printf (_("Usage: %s [OPTION]... [URL]...\n"), exec_name);
+  return fprintf (error ? stderr : stdout,
+                  _("Usage: %s [OPTION]... [URL]...\n"), exec_name);
 }
 
 /* Print the help message, describing all the available options.  If
@@ -436,6 +450,8 @@ Logging and input file:\n"),
     N_("\
   -B,  --base=URL            resolves HTML input-file links (-i -F)\n\
                              relative to URL.\n"),
+    N_("\
+       --config=FILE         Specify config file to use.\n"), 
     "\n",
 
     N_("\
@@ -448,7 +464,7 @@ Download:\n"),
   -O,  --output-document=FILE    write documents to FILE.\n"),
     N_("\
   -nc, --no-clobber              skip downloads that would download to\n\
-                                 existing files.\n"),
+                                 existing files (overwriting them).\n"),
     N_("\
   -c,  --continue                resume getting a partially-downloaded file.\n"),
     N_("\
@@ -456,6 +472,9 @@ Download:\n"),
     N_("\
   -N,  --timestamping            don't re-retrieve files unless newer than\n\
                                  local.\n"),
+    N_("\
+  --no-use-server-timestamps     don't set the local file's timestamp by\n\
+                                 the one on the server.\n"),
     N_("\
   -S,  --server-response         print server response.\n"),
     N_("\
@@ -473,7 +492,7 @@ Download:\n"),
     N_("\
        --waitretry=SECONDS       wait 1..SECONDS between retries of a retrieval.\n"),
     N_("\
-       --random-wait             wait from 0...2*WAIT secs between retrievals.\n"),
+       --random-wait             wait from 0.5*WAIT...1.5*WAIT secs between retrievals.\n"),
     N_("\
        --no-proxy                explicitly turn off proxy.\n"),
     N_("\
@@ -509,6 +528,8 @@ Download:\n"),
        --local-encoding=ENC      use ENC as the local encoding for IRIs.\n"),
     N_("\
        --remote-encoding=ENC     use ENC as the default remote encoding.\n"),
+    N_("\
+       --unlink                  remove file before clobber.\n"),
     "\n",
 
     N_("\
@@ -675,6 +696,9 @@ Recursive accept/reject:\n"),
     N_("\
   -I,  --include-directories=LIST  list of allowed directories.\n"),
     N_("\
+  --trust-server-names             use the name specified by the redirection\n\
+                                   url last component.\n"),
+    N_("\
   -X,  --exclude-directories=LIST  list of excluded directories.\n"),
     N_("\
   -np, --no-parent                 don't ascend to the parent directory.\n"),
@@ -685,12 +709,15 @@ Recursive accept/reject:\n"),
 
   size_t i;
 
-  printf (_("GNU Wget %s, a non-interactive network retriever.\n"),
-          version_string);
-  print_usage ();
+  if (printf (_("GNU Wget %s, a non-interactive network retriever.\n"),
+              version_string) < 0)
+    exit (3);
+  if (print_usage (0) < 0)
+    exit (3);
 
   for (i = 0; i < countof (help); i++)
-    fputs (_(help[i]), stdout);
+    if (fputs (_(help[i]), stdout) < 0)
+      exit (3);
 
   exit (0);
 }
@@ -725,9 +752,9 @@ static char *
 prompt_for_password (void)
 {
   if (opt.user)
-    printf (_("Password for user %s: "), quote (opt.user));
+    fprintf (stderr, _("Password for user %s: "), quote (opt.user));
   else
-    printf (_("Password: "));
+    fprintf (stderr, _("Password: "));
   return getpass("");
 }
 
@@ -735,7 +762,7 @@ prompt_for_password (void)
    to at most line_length. prefix is printed on the first line
    and an appropriate number of spaces are added on subsequent
    lines.*/
-static void
+static int
 format_and_print_line (const char *prefix, const char *line,
                        int line_length)
 {
@@ -750,7 +777,8 @@ format_and_print_line (const char *prefix, const char *line,
   if (line_length <= 0)
     line_length = MAX_CHARS_PER_LINE - TABULATION;
 
-  printf ("%s", prefix);
+  if (printf ("%s", prefix) < 0)
+    return -1;
   remaining_chars = line_length;
   /* We break on spaces. */
   token = strtok (line_dup, " ");
@@ -761,17 +789,21 @@ format_and_print_line (const char *prefix, const char *line,
          token on the next line. */
       if (remaining_chars <= strlen (token))
         {
-          printf ("\n%*c", TABULATION, ' ');
+          if (printf ("\n%*c", TABULATION, ' ') < 0)
+            return -1;
           remaining_chars = line_length - TABULATION;
         }
-      printf ("%s ", token);
+      if (printf ("%s ", token) < 0)
+        return -1;
       remaining_chars -= strlen (token) + 1;  /* account for " " */
       token = strtok (NULL, " ");
     }
 
-  printf ("\n");
+  if (printf ("\n") < 0)
+    return -1;
 
   xfree (line_dup);
+  return 0;
 }
 
 static void
@@ -781,82 +813,94 @@ print_version (void)
   const char *locale_title  = _("Locale: ");
   const char *compile_title = _("Compile: ");
   const char *link_title    = _("Link: ");
-  char *line;
   char *env_wgetrc, *user_wgetrc;
   int i;
 
-#ifdef __VMS
-  printf (_("GNU Wget %s built on VMS %s %s.\n\n"),
-   version_string, vms_arch(), vms_vers());
-#else /* def __VMS */
-  printf (_("GNU Wget %s built on %s.\n\n"), version_string, OS_TYPE);
-#endif /* def __VMS */
-  /* compiled_features is a char*[]. We limit the characters per
-     line to MAX_CHARS_PER_LINE and prefix each line with a constant
-     number of spaces for proper alignment. */
+  if (printf (_("GNU Wget %s built on %s.\n\n"), version_string, OS_TYPE) < 0)
+    exit (3);
+
   for (i = 0; compiled_features[i] != NULL; )
     {
       int line_length = MAX_CHARS_PER_LINE;
       while ((line_length > 0) && (compiled_features[i] != NULL))
         {
-          printf ("%s ", compiled_features[i]);
+          if (printf ("%s ", compiled_features[i]) < 0)
+            exit (3);
           line_length -= strlen (compiled_features[i]) + 2;
           i++;
         }
-      printf ("\n");
+      if (printf ("\n") < 0)
+        exit (3);
     }
-  printf ("\n");
+  if (printf ("\n") < 0)
+    exit (3);
+
   /* Handle the case when $WGETRC is unset and $HOME/.wgetrc is
      absent. */
-  printf ("%s\n", wgetrc_title);
+  if (printf ("%s\n", wgetrc_title) < 0)
+    exit (3);
+
   env_wgetrc = wgetrc_env_file_name ();
   if (env_wgetrc && *env_wgetrc)
     {
-      printf (_("    %s (env)\n"), env_wgetrc);
+      if (printf (_("    %s (env)\n"), env_wgetrc) < 0)
+        exit (3);
       xfree (env_wgetrc);
     }
   user_wgetrc = wgetrc_user_file_name ();
   if (user_wgetrc)
     {
-      printf (_("    %s (user)\n"), user_wgetrc);
+      if (printf (_("    %s (user)\n"), user_wgetrc) < 0)
+        exit (3);
       xfree (user_wgetrc);
     }
 #ifdef SYSTEM_WGETRC
-  printf (_("    %s (system)\n"), SYSTEM_WGETRC);
+  if (printf (_("    %s (system)\n"), SYSTEM_WGETRC) < 0)
+    exit (3);
 #endif
 
 #ifdef ENABLE_NLS
-  format_and_print_line (locale_title,
+  if (format_and_print_line (locale_title,
                         LOCALEDIR,
-                        MAX_CHARS_PER_LINE);
+                             MAX_CHARS_PER_LINE) < 0)
+    exit (3);
 #endif /* def ENABLE_NLS */
 
-  format_and_print_line (compile_title,
-			 compilation_string,
-			 MAX_CHARS_PER_LINE);
+  if (compilation_string != NULL)
+    if (format_and_print_line (compile_title,
+                               compilation_string,
+                               MAX_CHARS_PER_LINE) < 0)
+      exit (3);
 
-  format_and_print_line (link_title,
-			 link_string,
-			 MAX_CHARS_PER_LINE);
+  if (link_string != NULL)
+    if (format_and_print_line (link_title,
+                               link_string,
+                               MAX_CHARS_PER_LINE) < 0)
+      exit (3);
 
-  printf ("\n");
+  if (printf ("\n") < 0)
+    exit (3);
+
   /* TRANSLATORS: When available, an actual copyright character
      (cirle-c) should be used in preference to "(C)". */
-  fputs (_("\
-Copyright (C) 2009 Free Software Foundation, Inc.\n"), stdout);
-  fputs (_("\
+  if (fputs (_("\
+Copyright (C) 2009 Free Software Foundation, Inc.\n"), stdout) < 0)
+    exit (3);
+  if (fputs (_("\
 License GPLv3+: GNU GPL version 3 or later\n\
 <http://www.gnu.org/licenses/gpl.html>.\n\
 This is free software: you are free to change and redistribute it.\n\
-There is NO WARRANTY, to the extent permitted by law.\n"), stdout);
+There is NO WARRANTY, to the extent permitted by law.\n"), stdout) < 0)
+    exit (3);
   /* TRANSLATORS: When available, please use the proper diacritics for
      names such as this one. See en_US.po for reference. */
-  fputs (_("\nOriginally written by Hrvoje Niksic <hniksic@xemacs.org>.\n"),
-         stdout);
-  fputs (_("Currently maintained by Micah Cowan <micah@cowan.name>.\n"),
-         stdout);
-  fputs (_("Please send bug reports and questions to <bug-wget@gnu.org>.\n"),
-         stdout);
+  if (fputs (_("\nOriginally written by Hrvoje Niksic <hniksic@xemacs.org>.\n"),
+             stdout) < 0)
+    exit (3);
+  if (fputs (_("Please send bug reports and questions to <bug-wget@gnu.org>.\n"),
+             stdout) < 0)
+    exit (3);
+
   exit (0);
 }
 
@@ -867,29 +911,75 @@ main (int argc, char **argv)
 {
   char **url, **t;
   int i, ret, longindex;
-  int nurl, status;
+  int nurl;
   bool append_to_log = false;
 
+  total_downloaded_bytes = 0;
+
   program_name = argv[0];
+
+  struct ptimer *timer = ptimer_new ();
+  double start_time = ptimer_measure (timer);
 
   i18n_initialize ();
 
   /* Construct the name of the executable, without the directory part.  */
+#ifdef __VMS
+  /* On VMS, lose the "dev:[dir]" prefix and the ".EXE;nnn" suffix. */
+  exec_name = vms_basename (argv[0]);
+#else /* def __VMS */
   exec_name = strrchr (argv[0], PATH_SEPARATOR);
   if (!exec_name)
     exec_name = argv[0];
   else
     ++exec_name;
+#endif /* def __VMS [else] */
 
 #ifdef WINDOWS
   /* Drop extension (typically .EXE) from executable filename. */
   windows_main ((char **) &exec_name);
 #endif
 
-  /* Set option defaults; read the system wgetrc and ~/.wgetrc.  */
-  initialize ();
+  /* Load the hard-coded defaults.  */
+  defaults ();
 
   init_switches ();
+
+  /* This seperate getopt_long is needed to find the user config
+     and parse it before the other user options. */
+  longindex = -1;
+  int retconf;
+  bool use_userconfig = false;
+
+  while ((retconf = getopt_long (argc, argv,
+                                short_options, long_options, &longindex)) != -1)
+    {
+      int confval;
+      bool userrc_ret = true;
+      struct cmdline_option *config_opt;
+      confval = long_options[longindex].val;
+      config_opt = &option_data[confval & ~BOOLEAN_NEG_MARKER];
+      if (strcmp (config_opt->long_name, "config") == 0)
+        {
+          userrc_ret &= run_wgetrc (optarg);
+          use_userconfig = true;
+        }
+      if (!userrc_ret)
+        {
+          printf ("Exiting due to error in %s\n", optarg);
+          exit (2);
+        }
+      else
+        break;
+    }
+
+  /* If the user did not specify a config, read the system wgetrc and ~/.wgetrc. */
+  if (use_userconfig == false)
+    initialize ();
+
+  opterr = 0;
+  optind = 0;
+
   longindex = -1;
   while ((ret = getopt_long (argc, argv,
                              short_options, long_options, &longindex)) != -1)
@@ -903,7 +993,7 @@ main (int argc, char **argv)
         {
           if (ret == '?')
             {
-              print_usage ();
+              print_usage (0);
               printf ("\n");
               printf (_("Try `%s --help' for more options.\n"), exec_name);
               exit (2);
@@ -952,7 +1042,7 @@ main (int argc, char **argv)
                short options for convenience and backward
                compatibility.  */
             char *p;
-            for (p = optarg; *p; p++)
+            for (p = optarg; p && *p; p++)
               switch (*p)
                 {
                 case 'v':
@@ -971,10 +1061,12 @@ main (int argc, char **argv)
                   setoptval ("noparent", "1", opt->long_name);
                   break;
                 default:
-                  printf (_("%s: illegal option -- `-n%c'\n"), exec_name, *p);
-                  print_usage ();
-                  printf ("\n");
-                  printf (_("Try `%s --help' for more options.\n"), exec_name);
+                  fprintf (stderr, _("%s: illegal option -- `-n%c'\n"),
+                           exec_name, *p);
+                  print_usage (1);
+                  fprintf (stderr, "\n");
+                  fprintf (stderr, _("Try `%s --help' for more options.\n"),
+                           exec_name);
                   exit (1);
                 }
             break;
@@ -1007,6 +1099,14 @@ main (int argc, char **argv)
   /* All user options have now been processed, so it's now safe to do
      interoption dependency checks. */
 
+  if (opt.noclobber && opt.convert_links)
+    {
+      fprintf (stderr,
+               _("Both --no-clobber and --convert-links were specified,"
+                 "only --convert-links will be used.\n"));
+      opt.noclobber = false;
+    }
+
   if (opt.reclevel == 0)
       opt.reclevel = INFINITE_RECURSION; /* see recur.h for commentary */
 
@@ -1029,22 +1129,23 @@ main (int argc, char **argv)
   /* Sanity checks.  */
   if (opt.verbose && opt.quiet)
     {
-      printf (_("Can't be verbose and quiet at the same time.\n"));
-      print_usage ();
+      fprintf (stderr, _("Can't be verbose and quiet at the same time.\n"));
+      print_usage (1);
       exit (1);
     }
   if (opt.timestamping && opt.noclobber)
     {
-      printf (_("\
+      fprintf (stderr, _("\
 Can't timestamp and not clobber old files at the same time.\n"));
-      print_usage ();
+      print_usage (1);
       exit (1);
     }
 #ifdef ENABLE_IPV6
   if (opt.ipv4_only && opt.ipv6_only)
     {
-      printf (_("Cannot specify both --inet4-only and --inet6-only.\n"));
-      print_usage ();
+      fprintf (stderr,
+               _("Cannot specify both --inet4-only and --inet6-only.\n"));
+      print_usage (1);
       exit (1);
     }
 #endif
@@ -1055,8 +1156,8 @@ Can't timestamp and not clobber old files at the same time.\n"));
         {
           fputs (_("\
 Cannot specify both -k and -O if multiple URLs are given, or in combination\n\
-with -p or -r. See the manual for details.\n\n"), stdout);
-          print_usage ();
+with -p or -r. See the manual for details.\n\n"), stderr);
+          print_usage (1);
           exit (1);
         }
       if (opt.page_requisites
@@ -1076,27 +1177,30 @@ for details.\n\n"));
       if (opt.noclobber && file_exists_p(opt.output_document))
            {
               /* Check if output file exists; if it does, exit. */
-              logprintf (LOG_VERBOSE, _("File `%s' already there; not retrieving.\n"), opt.output_document);
+              logprintf (LOG_VERBOSE,
+                         _("File `%s' already there; not retrieving.\n"),
+                         opt.output_document);
               exit(1);
            }
     }
 
   if (opt.ask_passwd && opt.passwd)
     {
-      printf (_("Cannot specify both --ask-password and --password.\n"));
-      print_usage ();
+      fprintf (stderr,
+               _("Cannot specify both --ask-password and --password.\n"));
+      print_usage (1);
       exit (1);
     }
 
   if (!nurl && !opt.input_filename)
     {
       /* No URL specified.  */
-      printf (_("%s: missing URL\n"), exec_name);
-      print_usage ();
+      fprintf (stderr, _("%s: missing URL\n"), exec_name);
+      print_usage (1);
       printf ("\n");
       /* #### Something nicer should be printed here -- similar to the
          pre-1.5 `--help' page.  */
-      printf (_("Try `%s --help' for more options.\n"), exec_name);
+      fprintf (stderr, _("Try `%s --help' for more options.\n"), exec_name);
       exit (1);
     }
 
@@ -1113,10 +1217,11 @@ for details.\n\n"));
         opt.encoding_remote = NULL;
     }
 #else
+  memset (&dummy_iri, 0, sizeof (dummy_iri));
   if (opt.enable_iri || opt.locale || opt.encoding_remote)
     {
       /* sXXXav : be more specific... */
-      printf(_("This version does not have support for IRIs\n"));
+      fprintf (stderr, _("This version does not have support for IRIs\n"));
       exit(1);
     }
 #endif
@@ -1176,14 +1281,7 @@ for details.\n\n"));
       if (HYPHENP (opt.output_document))
         {
 #ifdef WINDOWS
-          FILE *result;
-          result = freopen ("CONOUT$", "wb", stdout);
-          if (result == NULL)
-            {
-              logputs (LOG_NOTQUIET, _("\
-WARNING: Can't reopen standard output in binary mode;\n\
-         downloaded file may contain inappropriate line endings.\n"));
-            }
+          _setmode (_fileno (stdout), _O_BINARY);
 #endif
           output_stream = stdout;
         }
@@ -1212,6 +1310,13 @@ WARNING: Can't reopen standard output in binary mode;\n\
           if (fstat (fileno (output_stream), &st) == 0 && S_ISREG (st.st_mode))
             output_stream_regular = true;
         }
+      if (!output_stream_regular && opt.convert_links)
+        {
+          fprintf (stderr, _("-k can be used together with -O only if \
+outputting to a regular file.\n"));
+          print_usage (1);
+          exit(1);
+        }
     }
 
 #ifdef __VMS
@@ -1219,13 +1324,9 @@ WARNING: Can't reopen standard output in binary mode;\n\
      any), otherwise according to the current default device.
   */
   if (output_stream == NULL)
-    {
-      set_ods5_dest( "SYS$DISK");
-    }
+    set_ods5_dest( "SYS$DISK");
   else if (output_stream != stdout)
-    {
-      set_ods5_dest( opt.output_document);
-    }
+    set_ods5_dest( opt.output_document);
 #endif /* def __VMS */
 
 #ifdef WINDOWS
@@ -1252,7 +1353,6 @@ WARNING: Can't reopen standard output in binary mode;\n\
   signal (SIGWINCH, progress_handle_sigwinch);
 #endif
 
-  status = RETROK;              /* initialize it, just-in-case */
   /* Retrieve the URLs from argument list.  */
   for (t = url; *t; t++)
     {
@@ -1272,7 +1372,7 @@ WARNING: Can't reopen standard output in binary mode;\n\
           char *error = url_error (*t, url_err);
           logprintf (LOG_NOTQUIET, "%s: %s.\n",*t, error);
           xfree (error);
-          status = URLERROR;
+          inform_exit_status (URLERROR);
         }
       else
         {
@@ -1285,14 +1385,14 @@ WARNING: Can't reopen standard output in binary mode;\n\
               if (url_scheme (*t) == SCHEME_FTP)
                 opt.follow_ftp = 1;
 
-              status = retrieve_tree (url_parsed, NULL);
+              retrieve_tree (url_parsed, NULL);
 
               opt.follow_ftp = old_follow_ftp;
             }
           else
           {
-            status = retrieve_url (url_parsed, *t, &filename, &redirected_URL,
-                                   NULL, &dt, opt.recursive, iri, true);
+            retrieve_url (url_parsed, *t, &filename, &redirected_URL, NULL,
+                          &dt, opt.recursive, iri, true);
           }
 
           if (opt.delete_after && file_exists_p(filename))
@@ -1313,7 +1413,9 @@ WARNING: Can't reopen standard output in binary mode;\n\
   if (opt.input_filename)
     {
       int count;
+      int status;
       status = retrieve_from_file (opt.input_filename, opt.force_html, &count);
+      inform_exit_status (status);
       if (!count)
         logprintf (LOG_NOTQUIET, _("No URLs found in %s.\n"),
                    opt.input_filename);
@@ -1321,9 +1423,7 @@ WARNING: Can't reopen standard output in binary mode;\n\
 
   /* Print broken links. */
   if (opt.recursive && opt.spider)
-    {
-      print_broken_links();
-    }
+    print_broken_links ();
 
   /* Print the downloaded sum.  */
   if ((opt.recursive || opt.page_requisites
@@ -1332,13 +1432,23 @@ WARNING: Can't reopen standard output in binary mode;\n\
       &&
       total_downloaded_bytes != 0)
     {
+      double end_time = ptimer_measure (timer);
+      ptimer_destroy (timer);
+
+      char *wall_time = xstrdup (secs_to_human_time (end_time - start_time));
+      char *download_time = xstrdup (secs_to_human_time (total_download_time));
       logprintf (LOG_NOTQUIET,
-                 _("FINISHED --%s--\nDownloaded: %d files, %s in %s (%s)\n"),
-                 datetime_str (time (NULL)),
-                 numurls,
-                 human_readable (total_downloaded_bytes),
-                 secs_to_human_time (total_download_time),
-                 retr_rate (total_downloaded_bytes, total_download_time));
+		 _("FINISHED --%s--\nTotal wall clock time: %s\n"
+		   "Downloaded: %d files, %s in %s (%s)\n"),
+		 datetime_str (time (NULL)),
+		 wall_time,
+		 numurls,
+		 human_readable (total_downloaded_bytes),
+		 download_time,
+		 retr_rate (total_downloaded_bytes, total_download_time));
+      xfree (wall_time);
+      xfree (download_time);
+
       /* Print quota warning, if exceeded.  */
       if (opt.quota && total_downloaded_bytes > opt.quota)
         logprintf (LOG_NOTQUIET,

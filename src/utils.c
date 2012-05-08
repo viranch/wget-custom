@@ -1,6 +1,7 @@
 /* Various utility functions.
    Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
-   2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation,
+   Inc.
 
 This file is part of GNU Wget.
 
@@ -34,29 +35,31 @@ as that of the covered work.  */
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#ifdef HAVE_SYS_TIME_H
-# include <sys/time.h>
-#endif
-#ifdef HAVE_UNISTD_H
-# include <unistd.h>
-#endif
+#include <unistd.h>
 #ifdef HAVE_MMAP
 # include <sys/mman.h>
 #endif
 #ifdef HAVE_PROCESS_H
 # include <process.h>  /* getpid() */
 #endif
-#ifdef HAVE_UTIME_H
-# include <utime.h>
-#endif
-#ifdef HAVE_SYS_UTIME_H
-# include <sys/utime.h>
-#endif
 #include <errno.h>
 #include <fcntl.h>
 #include <assert.h>
 #include <stdarg.h>
 #include <locale.h>
+
+#if HAVE_UTIME
+# include <sys/types.h>
+# ifdef HAVE_UTIME_H
+#  include <utime.h>
+# endif
+
+# ifdef HAVE_SYS_UTIME_H
+#  include <sys/utime.h>
+# endif
+#endif
+
+#include <sys/stat.h>
 
 /* For TIOCGWINSZ and friends: */
 #ifdef HAVE_SYS_IOCTL_H
@@ -138,7 +141,8 @@ memfatal (const char *context, long attempted_size)
       Vertical bar (|)
 
    Characters escaped by "^":
-      SP  !  #  %  &  '  (  )  +  ,  .  ;  =  @  [  ]  ^  `  {  }  ~
+      SP  !  "  #  %  &  '  (  )  +  ,  .  :  ;  =
+       @  [  \  ]  ^  `  {  |  }  ~
 
    Either "^_" or "^ " is accepted as a space.  Period (.) is a special
    case.  Note that un-escaped < and > can also confuse a directory
@@ -172,22 +176,22 @@ unsigned char char_prop[ 256] = {
     0,  0,  0,  0,  0,  0,  0,  0,   0,  0,  0,  0,  0,  0,  0,  0,
 
 /*  SP  !   "   #   $   %   &   '    (   )   *   +   ,   -   .   /  */
-    2,  1,  0,  1, 16,  1,  1,  1,   1,  1,  0,  1,  1, 16,  4,  0,
+    2,  1,  1,  1, 16,  1,  1,  1,   1,  1,  0,  1,  1, 16,  4,  0,
 
 /*  0   1   2   3   4   5   6   7    8   9   :   ;   <   =   >   ?  */
-   80, 80, 80, 80, 80, 80, 80, 80,  80, 80,  0,  1,  1,  1,  1,  1,
+   80, 80, 80, 80, 80, 80, 80, 80,  80, 80,  1,  1,  1,  1,  1,  1,
 
 /*  @   A   B   C   D   E   F   G    H   I   J   K   L   M   N   O  */
     1, 80, 80, 80, 80, 80, 80, 16,  16, 16, 16, 16, 16, 16, 16, 16,
 
 /*  P   Q   R   S   T   U   V   W    X   Y   Z   [   \   ]   ^   _  */
-   16, 16, 16, 16, 16, 16, 16, 16,  16, 16, 16,  1,  0,  1,  1, 16,
+   16, 16, 16, 16, 16, 16, 16, 16,  16, 16, 16,  1,  1,  1,  1, 16,
 
 /*  `   a   b   c   d   e   f   g    h   i   j   k   l   m   n   o  */
     1, 96, 96, 96, 96, 96, 96, 32,  32, 32, 32, 32, 32, 32, 32, 32,
 
 /*  p   q   r   s   t   u   v   w    x   y   z   {   |   }   ~  DEL */
-   32, 32, 32, 32, 32, 32, 32, 32,  32, 32, 32,  1,  0,  1, 17,  8,
+   32, 32, 32, 32, 32, 32, 32, 32,  32, 32, 32,  1,  1,  1, 17,  8,
 
     8,  8,  8,  8,  8,  8,  8,  8,   8,  8,  8,  8,  8,  8,  8,  8,
     8,  8,  8,  8,  8,  8,  8,  8,   8,  8,  8,  8,  8,  8,  8,  8,
@@ -491,18 +495,40 @@ fork_to_background (void)
 void
 touch (const char *file, time_t tm)
 {
-#ifdef HAVE_STRUCT_UTIMBUF
+#if HAVE_UTIME
+# ifdef HAVE_STRUCT_UTIMBUF
   struct utimbuf times;
-#else
+# else
   struct {
     time_t actime;
     time_t modtime;
   } times;
-#endif
+# endif
   times.modtime = tm;
   times.actime = time (NULL);
   if (utime (file, &times) == -1)
     logprintf (LOG_NOTQUIET, "utime(%s): %s\n", file, strerror (errno));
+#else
+  struct timespec timespecs[2];
+  int fd;
+
+  fd = open (file, O_WRONLY);
+  if (fd < 0)
+    {
+      logprintf (LOG_NOTQUIET, "open(%s): %s\n", file, strerror (errno));
+      return;
+    }
+
+  timespecs[0].tv_sec = time (NULL);
+  timespecs[0].tv_nsec = 0L;
+  timespecs[1].tv_sec = tm;
+  timespecs[1].tv_nsec = 0L;
+
+  if (futimens (fd, timespecs) == -1)
+    logprintf (LOG_NOTQUIET, "futimens(%s): %s\n", file, strerror (errno));
+
+  close (fd);
+#endif
 }
 
 /* Checks if FILE is a symbolic link, and removes it if it is.  Does
@@ -872,6 +898,9 @@ acceptable (const char *s)
 {
   int l = strlen (s);
 
+  if (opt.output_document && strcmp (s, opt.output_document) == 0)
+    return true;
+
   while (l && s[l] != '/')
     --l;
   if (s[l] == '/')
@@ -1148,18 +1177,18 @@ read_whole_line (FILE *fp)
    zero-terminated, and you should *not* read or write beyond the [0,
    length) range of characters.
 
-   After you are done with the file contents, call read_file_free to
+   After you are done with the file contents, call wget_read_file_free to
    release the memory.
 
    Depending on the operating system and the type of file that is
-   being read, read_file() either mmap's the file into memory, or
+   being read, wget_read_file() either mmap's the file into memory, or
    reads the file into the core using read().
 
    If file is named "-", fileno(stdin) is used for reading instead.
    If you want to read from a real file named "-", use "./-" instead.  */
 
 struct file_memory *
-read_file (const char *file)
+wget_read_file (const char *file)
 {
   int fd;
   struct file_memory *fm;
@@ -1269,7 +1298,7 @@ read_file (const char *file)
    memory needed to hold the FM structure itself.  */
 
 void
-read_file_free (struct file_memory *fm)
+wget_read_file_free (struct file_memory *fm)
 {
 #ifdef HAVE_MMAP
   if (fm->mmap_p)
@@ -1924,9 +1953,10 @@ abort_run_with_timeout (int sig)
   /* We don't have siglongjmp to preserve the set of blocked signals;
      if we longjumped out of the handler at this point, SIGALRM would
      remain blocked.  We must unblock it manually. */
-  int mask = siggetmask ();
-  mask &= ~sigmask (SIGALRM);
-  sigsetmask (mask);
+  sigset_t set;
+  sigemptyset (&set);
+  sigaddset (&set, SIGALRM);
+  sigprocmask (SIG_BLOCK, &set, NULL);
 
   /* Now it's safe to longjump. */
   longjmp (run_with_timeout_env, -1);

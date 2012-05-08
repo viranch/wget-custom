@@ -1,6 +1,7 @@
 # Makefile for `wget' utility
 # Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003,
-# 2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+# 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software
+# Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -33,6 +34,8 @@
 PERL     = perl
 PERLRUN = $(PERL) -I$(srcdir)
 
+LIBS     = @LIBICONV@ @LIBINTL@ @LIBS@ $(LIB_CLOCK_GETTIME)
+
 .PHONY: test run-unit-tests run-px-tests
 
 check-local: test
@@ -50,9 +53,6 @@ test: ../src/wget$(EXEEXT) run-unit-tests run-px-tests
 ../lib/libgnu.a:
 	cd ../lib && $(MAKE) $(AM_MAKEFLAGS)
 
-../md5/libmd5.a:
-	cd ../lib && $(MAKE) $(AM_MAKEFLAGS)
-
 run-unit-tests: unit-tests$(EXEEXT) ../src/libunittest.a
 	./unit-tests$(EXEEXT)
 
@@ -65,6 +65,7 @@ EXTRA_DIST = FTPServer.pm FTPTest.pm HTTPServer.pm HTTPTest.pm \
              Test-auth-no-challenge.px \
              Test-auth-no-challenge-url.px \
              Test-auth-with-content-disposition.px \
+             Test-auth-retcode.px \
              Test-c-full.px \
              Test-c-partial.px \
              Test-c.px \
@@ -84,10 +85,14 @@ EXTRA_DIST = FTPServer.pm FTPTest.pm HTTPServer.pm HTTPTest.pm \
              Test-HTTP-Content-Disposition-1.px \
              Test-HTTP-Content-Disposition-2.px \
              Test-HTTP-Content-Disposition.px \
+             Test-i-ftp.px \
+             Test-i-http.px \
              Test-idn-headers.px \
              Test-idn-meta.px \
              Test-idn-cmd.px \
+             Test-idn-cmd-utf8.px \
              Test-idn-robots.px \
+             Test-idn-robots-utf8.px \
              Test-iri.px \
              Test-iri-percent.px \
              Test-iri-disabled.px \
@@ -129,7 +134,6 @@ EXTRA_DIST = FTPServer.pm FTPTest.pm HTTPServer.pm HTTPTest.pm \
 
 check_PROGRAMS = unit-tests
 unit_tests_SOURCES =
-LDADD = ../src/libunittest.a ../lib/libgnu.a @LIBSSL@ @LIBGNUTLS@ \
-    @MD5_LDADD@
+LDADD = ../src/libunittest.a ../lib/libgnu.a $(LIBS)
 
 CLEANFILES = *~ *.bak core core.[0-9]*

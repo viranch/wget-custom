@@ -1,6 +1,7 @@
 /* Declarations for FTP support.
    Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
-   2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation,
+   Inc.
 
 This file is part of GNU Wget.
 
@@ -87,6 +88,13 @@ enum
   GLOB_GLOBALL, GLOB_GETALL, GLOB_GETONE
 };
 
+/* Used by to test if time parsed includes hours and minutes. */
+enum parsetype
+{
+  TT_HOUR_MIN, TT_DAY
+};
+
+
 /* Information about one filename in a linked list.  */
 struct fileinfo
 {
@@ -94,6 +102,7 @@ struct fileinfo
   char *name;			/* file name */
   wgint size;			/* file size */
   long tstamp;			/* time-stamp */
+  enum parsetype ptype; /* time parsing */
   int perms;			/* file permissions */
   char *linkto;			/* link to which file points */
   struct fileinfo *prev;	/* previous... */
@@ -120,7 +129,7 @@ enum wget_ftp_fstatus
 };
 
 struct fileinfo *ftp_parse_ls (const char *, const enum stype);
-uerr_t ftp_loop (struct url *, int *, struct url *, bool, bool);
+uerr_t ftp_loop (struct url *, char **, int *, struct url *, bool, bool);
 
 uerr_t ftp_index (const char *, struct url *, struct fileinfo *);
 

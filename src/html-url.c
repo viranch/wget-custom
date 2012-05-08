@@ -1,6 +1,6 @@
 /* Collect URLs from HTML source.
    Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006,
-   2007, 2008, 2009 Free Software Foundation, Inc.
+   2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
 
 This file is part of GNU Wget.
 
@@ -36,6 +36,7 @@ as that of the covered work.  */
 #include <errno.h>
 #include <assert.h>
 
+#include "exits.h"
 #include "html-parse.h"
 #include "url.h"
 #include "utils.h"
@@ -164,6 +165,7 @@ static struct {
    to the attributes not mentioned here.  We add them manually.  */
 static const char *additional_attributes[] = {
   "rel",                        /* used by tag_handle_link  */
+  "type",                       /* used by tag_handle_link  */
   "http-equiv",                 /* used by tag_handle_meta  */
   "name",                       /* used by tag_handle_meta  */
   "content",                    /* used by tag_handle_meta  */
@@ -335,13 +337,27 @@ append_url (const char *link_uri, int position, int size,
   else if (link_has_scheme)
     newel->link_complete_p = 1;
 
-  if (ctx->tail)
-    {
-      ctx->tail->next = newel;
-      ctx->tail = newel;
-    }
+  /* Append the new URL maintaining the order by position.  */
+  if (ctx->head == NULL)
+    ctx->head = newel;
   else
-    ctx->tail = ctx->head = newel;
+    {
+      struct urlpos *it, *prev = NULL;
+
+      it = ctx->head;
+      while (it && position > it->pos)
+        {
+          prev = it;
+          it = it->next;
+        }
+
+      newel->next = it;
+
+      if (prev)
+        prev->next = newel;
+      else
+        ctx->head = newel;
+    }
 
   return newel;
 }
@@ -350,12 +366,27 @@ static void
 check_style_attr (struct taginfo *tag, struct map_context *ctx)
 {
   int attrind;
+  int raw_start;
+  int raw_len;
   char *style = find_attr (tag, "style", &attrind);
   if (!style)
     return;
 
-  /* raw pos and raw size include the quotes, hence the +1 -2 */
-  get_urls_css (ctx, ATTR_POS(tag,attrind,ctx)+1, ATTR_SIZE(tag,attrind)-2);
+  /* raw pos and raw size include the quotes, skip them when they are
+     present.  */
+  raw_start = ATTR_POS (tag, attrind, ctx);
+  raw_len  = ATTR_SIZE (tag, attrind);
+  if( *(char *)(ctx->text + raw_start) == '\''
+      || *(char *)(ctx->text + raw_start) == '"')
+    {
+      raw_start += 1;
+      raw_len -= 2;
+    }
+
+  if(raw_len <= 0)
+       return;
+
+  get_urls_css (ctx, raw_start, raw_len);
 }
 
 /* All the tag_* functions are called from collect_tags_mapper, as
@@ -476,8 +507,8 @@ tag_handle_link (int tagid, struct taginfo *tag, struct map_context *ctx)
   /* All <link href="..."> link references are external, except those
      known not to be, such as style sheet and shortcut icon:
 
-       <link rel="stylesheet" href="...">
-       <link rel="shortcut icon" href="...">
+     <link rel="stylesheet" href="...">
+     <link rel="shortcut icon" href="...">
   */
   if (href)
     {
@@ -497,11 +528,18 @@ tag_handle_link (int tagid, struct taginfo *tag, struct map_context *ctx)
                 {
                   up->link_inline_p = 1;
                 }
+              else
+                {
+                  /* The external ones usually point to HTML pages, such as
+                     <link rel="next" href="...">
+                     except when the type attribute says otherwise:
+                     <link rel="alternate" type="application/rss+xml" href=".../?feed=rss2" />
+                  */
+                  char *type = find_attr (tag, "type", NULL);
+                  if (!type || strcasecmp (type, "text/html") == 0)
+                    up->link_expect_html = 1;
+                }
             }
-          else
-            /* The external ones usually point to HTML pages, such as
-               <link rel="next" href="..."> */
-            up->link_expect_html = 1;
         }
     }
 }
@@ -659,7 +697,7 @@ get_urls_html (const char *file, const char *url, bool *meta_disallow_follow,
   int flags;
 
   /* Load the file. */
-  fm = read_file (file);
+  fm = wget_read_file (file);
   if (!fm)
     {
       logprintf (LOG_NOTQUIET, "%s: %s\n", file, strerror (errno));
@@ -668,7 +706,7 @@ get_urls_html (const char *file, const char *url, bool *meta_disallow_follow,
   DEBUGP (("Loaded %s (size %s).\n", file, number_to_static_string (fm->length)));
 
   ctx.text = fm->content;
-  ctx.head = ctx.tail = NULL;
+  ctx.head = NULL;
   ctx.base = NULL;
   ctx.parent_base = url ? url : opt.base_href;
   ctx.document_file = file;
@@ -701,7 +739,7 @@ get_urls_html (const char *file, const char *url, bool *meta_disallow_follow,
     *meta_disallow_follow = ctx.nofollow;
 
   xfree_null (ctx.base);
-  read_file_free (fm);
+  wget_read_file_free (fm);
   return ctx.head;
 }
 
@@ -716,7 +754,7 @@ get_urls_file (const char *file)
   const char *text, *text_end;
 
   /* Load the file.  */
-  fm = read_file (file);
+  fm = wget_read_file (file);
   if (!fm)
     {
       logprintf (LOG_NOTQUIET, "%s: %s\n", file, strerror (errno));
@@ -773,6 +811,7 @@ get_urls_file (const char *file)
                      file, url_text, error);
           xfree (url_text);
           xfree (error);
+          inform_exit_status (URLERROR);
           continue;
         }
       xfree (url_text);
@@ -786,7 +825,7 @@ get_urls_file (const char *file)
         tail->next = entry;
       tail = entry;
     }
-  read_file_free (fm);
+  wget_read_file_free (fm);
   return head;
 }
 

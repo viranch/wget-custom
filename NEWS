@@ -1,10 +1,88 @@
 GNU Wget NEWS -- history of user-visible changes.
 
 Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005,
-2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
 See the end for copying conditions.
 
 Please send GNU Wget bug reports to <bug-wget@gnu.org>.
+
+* Changes in Wget 1.13.4
+
+** Now --version and --help work again.
+
+** Fix a build error on solaris 10 sparc.
+
+** Now --timestamping and --continue work well together.
+
+** Return a network failure when FTP downloads fail and --timestamping
+   is specified.
+
+
+* Changes in Wget 1.13.3
+
+** Support HTTP/1.1
+
+** Now by default the GNU TLS library for secure connections, instead of
+   OpenSSL.
+
+** Fix some portability issues.
+
+** Handle properly malformed status line in a HTTP response.
+
+** Ignore zero length domains in $no_proxy.
+
+** Set new cookies after an authorization failure.
+
+** Exit with failure if -k is specified and -O is not a regular file.
+
+** Cope better with unclosed html tags.
+
+** Print diagnostic messages to stderr, not stdout.
+
+** Do not use an additional HEAD request when --content-disposition is used,
+   but use directly GET.
+
+** Report the average transfer speed correctly when multiple URL's are specified
+   and -c influences the transferred data amount.
+
+** GNU TLS backend works again.
+
+** Now --timestamping and --continue works well together.
+
+** By default, on server redirects, use the original URL to get the
+   local file name. Close CVE-2010-2252.  This introduces a
+   backward-incompatibility; any script that relies on the old
+   behaviour must use --trust-server-names.
+
+** Fix a problem when -k is used and some URLs are specified trough
+   CSS.
+
+** Convert correctly URLs that need to be encoded to local files when following
+   links.
+
+** Use persistent connections with proxies supporting them.
+
+** Print the total download time as part of the summary for recursive downloads.
+
+** Now it is possible to specify a different startup configuration file trough
+   the --config option.
+
+** Fix an infinite loop with the error '<filename> has sprung into existence'
+   on a network error and -nc is used.
+
+** Now --adjust-extension does not modify the file extension if the file ends
+   in .htm.
+
+** Support HTTP/1.1 307 redirects keep request method.
+
+** Now --no-parent doesn't fetch undesired files if HTTP and HTTPS are used
+   by the same host on different pages.
+
+** Do not attempt to remove the file if it is not in the accept rules but
+   it is the output destination file.
+
+** Introduce `show_all_dns_entries' to print all IP addresses corresponding to
+   a DNS name when it is resolved.
 
 * Changes in Wget 1.12
 

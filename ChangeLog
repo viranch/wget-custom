@@ -1,9 +1,587 @@
+2011-09-04  Alan Hourihane <alanh@fairlite.co.uk> (tiny change)
+
+	* configure.ac: Check for libz when gnutls is used.
+
+2011-08-26  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* configure.ac: Under mingw don't check for static OpenSSL
+	libraries if the shared version was already found.
+	Suggested by: Ray Satiro <raysatiro@yahoo.com>.
+
+2011-08-25  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* configure.ac: Check for `utime'.
+
+2011-08-11  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* bootstrap.conf (gnulib_modules): Add `sigprocmask'.
+
+	* configure.ac: Do not hardcode GNU TLS and OpenSSL libraries.
+
+	* bootstrap.conf (gnulib_modules): Include module iconv.
+
+	* configure.ac: Allow --with-libgnutls-prefix and
+	--with-libssl-prefix
+	Suggested by: Karl Berry <karl@freefriends.org>
+
+	* build-aux/bzr-version-gen (TAG): Consider only the last tag.
+
+2011-08-10  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* configure.ac: Print usage string for --with-ssl.
+	Reported by: Karl Berry <karl@freefriends.org>
+
+	* configure.ac: Check for `gnutls_priority_set_direct' when gnutls is
+	used.
+	Reported by: Karl Berry <karl@freefriends.org>
+
+2011-08-09  Giuseppe Scrivano  <gscrivano@southpole.se>
+
+	* build-aux/bzr-version-gen: Fix some portability issues.
+
+2011-05-25  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* bootstrap.conf (gnulib_modules): Add `strerror_r-posix'.
+
+2011-05-19  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* COPYING: Fix the copyright years.
+	Reported by: Brett Smith <brett@fsf.org>.
+
+2011-04-19  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* bootstrap.conf (gnulib_modules): Add `mkdir'.
+
+2011-04-19  Ray Satiro <raysatiro@yahoo.com>
+
+	* configure.ac: Adjust indentation.
+
+2011-04-17  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* configure.ac: Do not check the host_os twice and if windres is
+	available.
+	Reported by: Ray Satiro <raysatiro@yahoo.com>
+
+2011-04-16  Ray Satiro <raysatiro@yahoo.com>
+2011-04-16  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* configure.ac: Detect dynamically linked OpenSSL libraries under
+	mingw32.
+
+2011-04-14  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* bootstrap: Update from gnulib.
+
+	* bootstrap.conf (gnulib_modules): Add `pipe' and `sigpipe'.
+
+	* .cvsignore: Remove file.
+	* .hgignore: Likewise.
+	* .symlinks: Likewise.
+
+	* bootstrap.conf (gnulib_modules): Add `mbtowc and `unlocked-io'.
+
+2011-04-04  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* configure.ac: Use AC_CHECK_LIB to look for the openssl library.
+
+2011-04-03  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* bootstrap.conf (gnulib_modules): Add `fcntl'.
+
+	(gnulib_modules): Add `ioctl'.
+
+2011-03-26  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* configure.ac: Fix the gnutls detection.
+
+2011-03-21  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* bootstrap: Update from gnulib.
+
+2011-03-19  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* bootstrap.conf (buildreq): Update build prerequisites list.
+
+2010-12-07  Jessica McKellar <jesstess@mit.edu> (tiny change)
+
+	* vms/WGET.HLP: Make help message clearer.
+
+2010-10-24  Jessica McKellar <jesstess@mit.edu> (tiny change)
+
+	* NEWS: Mention the change to the the summary for recursive downloads.
+
+2010-10-23  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* configure.ac: Add check for libgpg-error and libgcrypt.
+
+2010-09-06  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* lib/Makefile.am: Fix typo.
+
+2010-08-08  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* Makefile.am (EXTRA_DIST): Remove configure.bat.
+
+2010-07-24  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* configure.bat: Remove file.
+
+2010-07-11  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* configure.ac (AC_CHECK_SIZEOF): Quote argument.
+	Reported by: Jochen Roderburg <Roderburg@Uni-Koeln.DE>.
+
+2010-07-09  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* bootstrap.conf (buildreq): Relax gettext version to 0.17.
+
+2010-07-09  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* bootstrap.conf (gnulib_modules): Add `vasprintf'.  Remove `asprintf'.
+
+2010-07-05  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* bootstrap.conf (gnulib_modules): Add `asprintf'.
+
+2010-06-22  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* configure.ac: By default use GNU TLS not OpenSSL.
+
+2010-06-17  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* windows: Remove directory.
+	* Makefile.am (SUBDIRS): Remove windows.
+	* configure.ac: Don't generate windows/Makefile.
+
+2010-06-15  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* m4/wget.m4 (WGET_STRUCT_SOCKADDR_STORAGE): Guard header inclusions.
+	(TYPE_STRUCT_SOCKADDR_IN6): Likewise.
+	(MEMBER_SIN6_SCOPE_ID): Likewise.
+	(PROTO_INET6): Likewise.
+
+	* configure.ac: Don't check for `getaddrinfo'.
+
+	* bootstrap.conf (gnulib_modules): Add `getaddrinfo' module.
+
+2010-06-10  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* configure.ac (AM_INIT_AUTOMAKE): Remove dist-bzip2 dist-lzma from
+	automake options.
+	Reported by: Daniel Stenberg <daniel@haxx.se>.
+
+2010-06-10  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* bootstrap.conf (buildreq): Add definition.
+
+2010-06-04  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* build-aux/build_info.pl: Use /usr/bin/env to find the perl
+	interpreter.
+	* util/paramcheck.pl: Likewise.
+	* util/rmold.pl: Likewise.
+	Reported by sci-fi@hush.ai.
+
+2010-06-03  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* bootstrap.conf (gnulib_modules): Add iconv-h.
+
+2010-06-03  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* configure.ac (W32LIBS): Remove -lwsock32.
+
+2010-05-27  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* bootstrap.conf (gnulib_modules): Add `snprintf' module.
+
+	* configure.ac: Remove check for the `snprintf' function.
+
+2010-05-16  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* md5: Remove directory.
+
+	* bootstrap.conf (gnulib_modules): Add crypto/md5.
+
+	* configure.ac: Remove any check for md5 libraries.
+
+	* Makefile.am (ACLOCAL_AMFLAGS): Remove -I md5/m4.
+	(SUBDIRS): Remove md5.
+
+2010-05-15  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* bootstrap.conf (gnulib_modules): Add "getopt-gnu".  Remove "getopt".
+
+2010-05-14  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* bootstrap (gnulib_path): Default to "gnulib" if it doesn't have a
+	value.  Redirect "git clone" stderr to stdout.
+
+2010-05-09  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* build-aux/bzr-version-gen: New file.
+
+	* Makefile.am (EXTRA_DIST): Add .version.
+	(BUILT_SOURCES): New defition.
+	(.version): New rule.
+	(dist-hook): Likewise.
+
+	* configure.ac (AC_INIT): Use build-aux/bzr-version-gen to generate the
+	version string.
+
+2010-05-08  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* Makefile.am: Update copyright years.
+
+	* build-aux/build_info.pl: Likewise.
+
+	* configure.ac: Likewise.
+
+	* configure.bat: Likewise.
+
+	* doc/Makefile.am: Likewise.
+
+	* doc/fdl.texi: Likewise.
+
+	* doc/texi2pod.pl: Likewise.
+
+	* doc/wget.texi: Likewise.
+
+	* m4/exitfail.m4: Likewise.
+
+	* m4/getpagesize.m4: Likewise.
+
+	* m4/wchar.m4: Likewise.
+
+	* m4/wctype.m4: Likewise.
+
+	* m4/wget.m4: Likewise.
+
+	* md5/Makefile.am: Likewise.
+
+	* md5/dummy.c: Likewise.
+
+	* md5/m4/00gnulib.m4: Likewise.
+
+	* md5/m4/gnulib-cache.m4: Likewise.
+
+	* md5/m4/gnulib-common.m4: Likewise.
+
+	* md5/m4/gnulib-comp.m4: Likewise.
+
+	* md5/m4/gnulib-tool.m4: Likewise.
+
+	* md5/m4/include_next.m4: Likewise.
+
+	* md5/m4/longlong.m4: Likewise.
+
+	* md5/m4/md5.m4: Likewise.
+
+	* md5/m4/multiarch.m4: Likewise.
+
+	* md5/m4/stddef_h.m4: Likewise.
+
+	* md5/m4/stdint.m4: Likewise.
+
+	* md5/m4/wchar.m4: Likewise.
+
+	* md5/m4/wchar_t.m4: Likewise.
+
+	* md5/m4/wint_t.m4: Likewise.
+
+	* md5/md5.h: Likewise.
+
+	* md5/stddef.in.h: Likewise.
+
+	* md5/stdint.in.h: Likewise.
+
+	* md5/wchar.in.h: Likewise.
+
+	* msdos/config.h: Likewise.
+
+	* msdos/msdos.c: Likewise.
+
+	* po/POTFILES.in: Likewise.
+
+	* util/Makefile.am: Likewise.
+
+	* util/paramcheck.pl: Likewise.
+
+	* util/rmold.pl: Likewise.
+
+2010-05-07  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* configure.ac: Don't call macro WGET_SOCKLEN_T.
+	(W32LIBS): Add -lws2_32.
+
+	* Makefile.am (EXTRA_DIST): Remove autogen.sh.
+
+	* bootstrap.conf (gnulib_modules): Use new modules from gnulib: accept,
+	bind, close, connect, getpeername, getsockname, listen, setsockopt.
+
+	* m4/wget.m4 (WGET_SOCKLEN_T): Remove macro.
+
+	* po/wget.pot: Remove.
+
+2010-05-07  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* configure.ac (ALL_LINGUAS): Remove.
+
+2010-05-06  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* bootstrap: New file.
+	* bootstrap.conf: New file.
+	* lib/Makefile.am: include gnulib.mk.
+	* autogen.sh: Removed.
+	* GNUmakefile: Likewise.
+	* INSTALL: Likewise.
+	* build-aux/announce-gen: Likewise.
+	* build-aux/compile: Likewise.
+	* build-aux/config.guess: Likewise.
+	* build-aux/config.rpath: Likewise.
+	* build-aux/config.sub: Likewise.
+	* build-aux/depcomp: Likewise.
+	* build-aux/gnupload: Likewise.
+	* build-aux/install-sh: Likewise.
+	* build-aux/mdate-sh: Likewise.
+	* build-aux/missing: Likewise.
+	* build-aux/mkinstalldirs: Likewise.
+	* build-aux/texinfo.tex: Likewise.
+	* build-aux/update-copyright: Likewise.
+	* build-aux/useless-if-before-free: Likewise.
+	* build-aux/vc-list-files: Likewise.
+	* build-aux/ylwrap: Likewise.
+	* lib/DESCRIP_DEPS.MMS: Likewise.
+	* lib/DESCRIP_MODS.MMS: Likewise.
+	* lib/DESCRIP_SRC.MMS: Likewise.
+	* lib/alloca.c: Likewise.
+	* lib/alloca.in.h: Likewise.
+	* lib/c-ctype.c: Likewise.
+	* lib/c-ctype.h: Likewise.
+	* lib/config.charset: Likewise.
+	* lib/errno.in.h: Likewise.
+	* lib/error.c: Likewise.
+	* lib/error.h: Likewise.
+	* lib/exitfail.c: Likewise.
+	* lib/exitfail.h: Likewise.
+	* lib/fseeko.c: Likewise.
+	* lib/getdelim.c: Likewise.
+	* lib/getline.c: Likewise.
+	* lib/getopt.c: Likewise.
+	* lib/getopt.in.h: Likewise.
+	* lib/getopt1.c: Likewise.
+	* lib/getopt_int.h: Likewise.
+	* lib/getpagesize.c: Likewise.
+	* lib/getpass.c: Likewise.
+	* lib/getpass.h: Likewise.
+	* lib/gettext.h: Likewise.
+	* lib/intprops.h: Likewise.
+	* lib/localcharset.c: Likewise.
+	* lib/localcharset.h: Likewise.
+	* lib/lseek.c: Likewise.
+	* lib/mbrtowc.c: Likewise.
+	* lib/mbsinit.c: Likewise.
+	* lib/memchr.c: Likewise.
+	* lib/memchr.valgrind: Likewise.
+	* lib/quote.c: Likewise.
+	* lib/quote.h: Likewise.
+	* lib/quotearg.c: Likewise.
+	* lib/quotearg.h: Likewise.
+	* lib/realloc.c: Likewise.
+	* lib/ref-add.sin: Likewise.
+	* lib/ref-del.sin: Likewise.
+	* lib/stdbool.in.h: Likewise.
+	* lib/stddef.in.h: Likewise.
+	* lib/stdint.in.h: Likewise.
+	* lib/stdio-impl.h: Likewise.
+	* lib/stdio-write.c: Likewise.
+	* lib/stdio.in.h: Likewise.
+	* lib/stdlib.in.h: Likewise.
+	* lib/str-two-way.h: Likewise.
+	* lib/strcasecmp.c: Likewise.
+	* lib/strcasestr.c: Likewise.
+	* lib/streq.h: Likewise.
+	* lib/strerror.c: Likewise.
+	* lib/string.in.h: Likewise.
+	* lib/strings.in.h: Likewise.
+	* lib/strncasecmp.c: Likewise.
+	* lib/unistd.in.h: Likewise.
+	* lib/verify.h: Likewise.
+	* lib/wchar.in.h: Likewise.
+	* lib/wctype.in.h: Likewise.
+	* lib/xalloc-die.c: Likewise.
+	* lib/xalloc.h: Likewise.
+	* lib/xmalloc.c: Likewise.
+	* m4/00gnulib.m4: Likewise.
+	* m4/alloca.m4: Likewise.
+	* m4/codeset.m4: Likewise.
+	* m4/errno_h.m4: Likewise.
+	* m4/error.m4: Likewise.
+	* m4/extensions.m4: Likewise.
+	* m4/fseeko.m4: Likewise.
+	* m4/getdelim.m4: Likewise.
+	* m4/getline.m4: Likewise.
+	* m4/getopt.m4: Likewise.
+	* m4/getpass.m4: Likewise.
+	* m4/gettext.m4: Likewise.
+	* m4/glibc21.m4: Likewise.
+	* m4/gnulib-cache.m4: Likewise.
+	* m4/gnulib-common.m4: Likewise.
+	* m4/gnulib-comp.m4: Likewise.
+	* m4/gnulib-tool.m4: Likewise.
+	* m4/iconv.m4: Likewise.
+	* m4/include_next.m4: Likewise.
+	* m4/inline.m4: Likewise.
+	* m4/lib-ld.m4: Likewise.
+	* m4/lib-link.m4: Likewise.
+	* m4/lib-prefix.m4: Likewise.
+	* m4/localcharset.m4: Likewise.
+	* m4/locale-fr.m4: Likewise.
+	* m4/locale-ja.m4: Likewise.
+	* m4/locale-zh.m4: Likewise.
+	* m4/longlong.m4: Likewise.
+	* m4/lseek.m4: Likewise.
+	* m4/malloc.m4: Likewise.
+	* m4/mbrtowc.m4: Likewise.
+	* m4/mbsinit.m4: Likewise.
+	* m4/mbstate_t.m4: Likewise.
+	* m4/memchr.m4: Likewise.
+	* m4/mmap-anon.m4: Likewise.
+	* m4/multiarch.m4: Likewise.
+	* m4/nls.m4: Likewise.
+	* m4/po.m4: Likewise.
+	* m4/progtest.m4: Likewise.
+	* m4/quote.m4: Likewise.
+	* m4/quotearg.m4: Likewise.
+	* m4/realloc.m4: Likewise.
+	* m4/stdbool.m4: Likewise.
+	* m4/stddef_h.m4: Likewise.
+	* m4/stdint.m4: Likewise.
+	* m4/stdio_h.m4: Likewise.
+	* m4/stdlib_h.m4: Likewise.
+	* m4/strcase.m4: Likewise.
+	* m4/strcasestr.m4: Likewise.
+	* m4/strerror.m4: Likewise.
+	* m4/string_h.m4: Likewise.
+	* m4/strings_h.m4: Likewise.
+	* m4/unistd_h.m4: Likewise.
+	* m4/wchar_t.m4: Likewise.
+	* m4/wint_t.m4: Likewise.
+	* m4/xalloc.m4: Likewise.
+	* maint.mk: Likewise.
+	* po/Makefile.in.in: Likewise.
+	* po/Makevars: Likewise.
+	* po/Rules-quot: Likewise.
+	* po/be.po: Likewise.
+	* po/bg.po: Likewise.
+	* po/boldquot.sed: Likewise.
+	* po/ca.po: Likewise.
+	* po/cs.po: Likewise.
+	* po/da.po: Likewise.
+	* po/de.po: Likewise.
+	* po/el.po: Likewise.
+	* po/en_GB.po: Likewise.
+	* po/eo.po: Likewise.
+	* po/es.po: Likewise.
+	* po/et.po: Likewise.
+	* po/eu.po: Likewise.
+	* po/fi.po: Likewise.
+	* po/fr.po: Likewise.
+	* po/ga.po: Likewise.
+	* po/gl.po: Likewise.
+	* po/he.po: Likewise.
+	* po/hr.po: Likewise.
+	* po/hu.po: Likewise.
+	* po/id.po: Likewise.
+	* po/it.po: Likewise.
+	* po/ja.po: Likewise.
+	* po/lt.po: Likewise.
+	* po/nb.po: Likewise.
+	* po/nl.po: Likewise.
+	* po/pl.po: Likewise.
+	* po/pt.po: Likewise.
+	* po/pt_BR.po: Likewise.
+	* po/quot.sed: Likewise.
+	* po/ro.po: Likewise.
+	* po/ru.po: Likewise.
+	* po/sk.po: Likewise.
+	* po/sl.po: Likewise.
+	* po/sr.po: Likewise.
+	* po/sv.po: Likewise.
+	* po/tr.po: Likewise.
+	* po/uk.po: Likewise.
+	* po/vi.po: Likewise.
+	* po/zh_CN.po: Likewise.
+	* po/zh_TW.po: Likewise.
+
+2010-05-04  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* AUTHORS: Added myself.
+
+2010-05-03  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* configure.ac: Fix a sanity check by the AC_CONFIG_SRCDIR macro.
+
+2010-05-01  Giuseppe Scrivano  <gscrivano@gnu.org>
+
+	* NEWS: Mention support for HTTP/1.1.
+
+2009-10-09  Steven Schweda  <sms@antinode.info>
+
+	* New VMS MMS/MMK builders, to accommodate the new source tree
+	structure:
+	lib/DESCRIP_DEPS.MMS            Dependencies (lib)
+	lib/DESCRIP_MODS.MMS            Modules (lib)
+	lib/DESCRIP_SRC.MMS             Main (lib)
+	md5/DESCRIP_DEPS.MMS            Dependencies (md5)
+	md5/DESCRIP_MODS.MMS            Modules (md5)
+	md5/DESCRIP_SRC.MMS             Main (md5)
+	src/DESCRIP_DEPS.MMS            Dependencies (src)
+	src/DESCRIP_MODS.MMS            Modules (src)
+	src/DESCRIP_SRC.MMS             Main (src)
+	vms/DESCRIP.MMS                 Main (global)
+	vms/DESCRIP_MKDEPS.MMS          Dependency generator
+	vms/DESCRIP_SRC.MMS             Main (main)
+	vms/DESCRIP_SRC_CMN.MMS         Main (common)
+	vms/DESCRIP_SRC_FLAGS.MMS       Compiler and linker flags
+	vms/COLLECT_DEPS.COM            Dependency processor
+	vms/CONFIG_EXTRACT.COM          Extract AC_INIT from configure.ac
+	vms/WGET_MULTINET.OPT           Link options for (old) MultiNet
+	vms/WGET_SSL_HP.OPT             Link options for HP SSL
+	vms/WGET_SSL_O.OPT              Link options for OpenSSL
+
+	* Other VMS-specific files:
+	vms/alloca.h                    Dummy alloca.h.
+	vms/config.h_vms                Manually crafted config.h
+	vms/stdint.h                    Dummy stdint.h
+	vms/vms.h                       Declarations, prototypes for vms.c
+	vms/vms_ip.h                    Helper for netdb.h
+	vms/VMS_NOTES.TXT               Instructions, notes
+	vms/WGET.HLP                    Basic VMS HELP
+
+2009-10-09  Micah Cowan  <micah@cowan.name>
+
+	* build_aux/build_info.pl: Reworked the input format. Eliminated
+	support, and need, for arbitrary #if blocks. Introduced
+	"choices", and explicitly open the .c file rather than print to
+	STDOUT, so we avoid creating the file if we find problems with
+	the input. Options are advertised in alphabetical order.
+
+2009-09-24  Micah Cowan  <micah@cowan.name>
+
+	* vms/vms.c: Moved to src/src.c.
+
+2009-09-22  Micah Cowan  <micah@cowan.name>
+
+	* configure.ac: Added "sleep" and "symlink" to AC_CHECK_FUNCS,
+	removing the hard-coded definition of HAVE_SYMLINK. When running
+	on MinGW, compile mswindows.c, and link against libwsock32.
+
 2009-09-21  Micah Cowan  <micah@cowan.name>
 
 	* vms/VMS-WGET.COM: "the the" -> "the".
 
 	* po/POTFILES.in: Removed some files that are not using gettext.
-	
+
 	* po/*.po: Updated from translationproject.org.
 
 2009-09-20  Micah Cowan  <micah@cowan.name>
@@ -63,7 +641,7 @@
 	* build-aux/gnupload: Imported from gnulib.
 	* lib/Makefile.am, m4/gnulib-cache.m4, m4/gnulib-comp.m4: Adjusted
 	for announce-gen, update-copyright, and gnupload.
-	
+
 2009-09-03  Micah Cowan  <micah@cowan.name>
 
 	* NEWS: Give credit to jff for SSL security fix, call attention to
@@ -161,7 +739,7 @@
 
 	* po/Makefile.in.in (distclean): remove en_US.po, too.
 
-	* Makefile.am: Include md5 as a subdir unconditionally. 
+	* Makefile.am: Include md5 as a subdir unconditionally.
 	It may result in useless compilation, and additional risk of
 	breaking a build of something that isn't actually needed, but
 	otherwise it's too much of a hassle to manage a failure-free
@@ -225,14 +803,14 @@
 
 	* po/quot.sed, po/boldquot.sed: Automatic handling of quotearg's `
 	and '.
-	
+
 2008-05-15  Micah Cowan  <micah@cowan.name>
 
 	* NEWS: Entry for --ask-password.
 
 2008-05-14  Joao Ferreira  <joao@joaoff.com>
 
-	* src/main.c, src/http.c, src/ftp.c: -nc is now working in 
+	* src/main.c, src/http.c, src/ftp.c: -nc is now working in
 	conjunction with '-O file'.
 
 2008-05-12  Micah Cowan  <micah@cowan.name>
@@ -247,13 +825,13 @@
 
 	* lib/getdelim.c, lib/getline.c, lib/getpass.c,
 	lib/getpass.h, lib/realloc.c, lib/stdio.h,
-	lib/stdio.in.h, lib/stdlib.h, lib/stdlib.in.h: Imported 
+	lib/stdio.in.h, lib/stdlib.h, lib/stdlib.in.h: Imported
 	from gnulib.
-	* m4/eoverflow.m4, m4/extensions.m4, m4/getdelim.m4, 
-	m4/getline.m4, m4/getpass.m4, m4/malloc.m4, m4/realloc.m4, 
+	* m4/eoverflow.m4, m4/extensions.m4, m4/getdelim.m4,
+	m4/getline.m4, m4/getpass.m4, m4/malloc.m4, m4/realloc.m4,
 	m4/stdio_h.m4, m4/stdlib_h.m4: Imported from gnulib.
 	* md5/stdint.h: Imported from gnulib.
-	
+
 	* GNUmakefile: Updated from gnulib.
 	* lib/Makefile.am, lib/getopt.c, lib/unistd.in.h: Updated
 	from gnulib.
@@ -263,7 +841,7 @@
 	md5/m4/gnulib-comp.m4, md5/m4/include_next.m4, md5/m4/md5.m4,
 	md5/m4/stdint.m4, md5/md5.c, md5/md5.h, md5/stdint.in.h,
 	md5/wchar.in.h: Updated from gnulib.
- 
+
 2008-04-24  Micah Cowan  <micah@cowan.name>
 
 	* NEWS: Removed info about move to Automake, Gnulib. Added item
@@ -581,7 +1159,7 @@
 
 2006-07-17  Daniel Richard G.  <skunk@iSKUNK.ORG>
 
-	* Makefile.in: Added DESTDIR='$(DESTDIR)' to MAKEDEFS. 
+	* Makefile.in: Added DESTDIR='$(DESTDIR)' to MAKEDEFS.
 
 2006-07-14  Mauro Tortonesi  <mauro@ferrara.linux.it>
 
@@ -602,13 +1180,13 @@
 2005-11-02  Mauro Tortonesi  <mauro@ferrara.linux.it>
 
 	* Makefile.in: Improved support for unit testing.
-	
+
 	* configure.in: Ditto.
-	
+
 2005-10-27  Mauro Tortonesi  <mauro@ferrara.linux.it>
 
 	* Makefile.in: Added basic support for unit testing.
-	
+
 2005-08-26  Stepan Kasal  <kasal@ucw.cz>
 
 	* configure.in: Abort configure if --with-ssl given but SSL
@@ -1812,7 +2390,7 @@
 
 	* aclocal.m4: Appended libtool 1.3.5's libtool.m4 to it.
 
-	* configure.in: Use AM_PROG_LIBTOOL macro (now defined in our 
+	* configure.in: Use AM_PROG_LIBTOOL macro (now defined in our
 	aclocal.m4) to create a libtool script from ltconfig and ltmain.sh.
 	If --with-ssl specified, look in /usr/local/ssl/lib by default for
 	OpenSSL libs.  Allow override with --with-ssl=<OpenSSL_root_dir>.
@@ -1835,11 +2413,11 @@
 	so I've put the item back, with a modified wording.
 
 	* config.guess: Hadn't been updated since 1996 -- didn't work for recent
-	machines and OSes, such as NetWinder ARM Linux.  Updated to latest 
+	machines and OSes, such as NetWinder ARM Linux.  Updated to latest
 	version (2001-03-16) from <ftp://ftp.gnu.org/pub/gnu/config/>.
-	
+
 	* config.sub: Ditto -- updated to latest version (2001-03-12).
-	
+
 2001-03-12  Dan Harkless  <wget@harkless.org>
 
 	* TODO: Only normal recursion should respect -np -- page-requisite
@@ -1889,7 +2467,7 @@
 	* TODO: Remove empty directories created due to --accept/--reject.
 
 	* configure.in: Look for perl and pod2man and make substitutions.
-	
+
 	* Makefile.in (install): Do install.man if we have pod2man.
 
 2001-02-13  Jan Prikryl  <prikryl@cg.tuwien.ac.at>
@@ -1898,7 +2476,7 @@
 
 	* windows/wget.dep: Ditto.
 
-	* windows/Makefile.watcom: Ditto. 
+	* windows/Makefile.watcom: Ditto.
 
 2001-01-23  Herold Heiko  <Heiko.Herold@previnet.it>
 
@@ -1921,13 +2499,13 @@
 	* po/Makefile.in.in: `make realclean' equal to `make
 	maintainer-clean'.
 
-	* Makefile.in (realclean-top): Remove 'configure' as well. 
+	* Makefile.in (realclean-top): Remove 'configure' as well.
 
 2001-01-11  Dan Harkless  <wget@harkless.org>
 
 	* TODO: If -c used with -N, check to make sure a file hasn't
 	changed on the server before "continuing" to download it.
-	
+
 2001-01-11  Adrian Aichner  <Adrian.Aichner@t-online.de>
 
 	* windows/Makefile.src: Updated.
@@ -1937,7 +2515,7 @@
 2001-01-09  Dan Harkless  <wget@harkless.org>
 
 	* TODO: If -c is on, don't re-download a 100%-downloaded file.
-	
+
 	* TODO: The bug where you couldn't recurse into ftp directories if
 	logging in put you somewhere else besides the server's "/"
 	directory got fixed without the TODO entry for it being removed.
@@ -1980,12 +2558,12 @@
 	"1.6-pre" guy).  In any case, the 'POT-Creation-Date's and
 	'PO-Revision-Date's remain the best indicator of whether a
 	translation's out of date.
-	
+
 	* ChangeLog: Since this flat file doesn't have multiple branches,
 	looking at the dates would make you think that things went into
 	1.6 that actually just went into the 1.7-dev branch.  Added "[Not
 	in 1.6 branch.]" where appropriate to clarify.
-	
+
 2000-12-18  Csaba Raduly  <csaba.raduly@sophos.com>
 
 	* windows/Makefile.watcom: Updated.
@@ -2006,7 +2584,7 @@
 
 	* Makefile.in (SUBDIRS): Add 'windows'.
 	(dist, DISTFILES): Don't distribute CVS directories.
-	
+
 2000-12-05  Hrvoje Niksic  <hniksic@arsdigita.com>
 
 	* configure.in: Don't unconditionally define HAVE_SSL, even when
@@ -2015,9 +2593,9 @@
 2000-12-03  Christian Fraenkel  <christian.fraenkel@gmx.net>
 
 	* INSTALL: Added the --with-ssl switch.
-	
+
 	* configure.in: Ditto.
-	
+
 	* TODO: Removed the corresponding entry.
 
 2000-11-23  Hrvoje Niksic  <hniksic@arsdigita.com>
@@ -2082,7 +2660,7 @@
 	* po/pl.{gmo,po}: Added Grzegorz Kowal <g_kowal@poczta.onet.pl>'s
 	Polish message translation file.
 
-	* po/ru.{gmo,po}: Added Const Kaplinsky <const@ce.cctpu.edu.ru>'s 
+	* po/ru.{gmo,po}: Added Const Kaplinsky <const@ce.cctpu.edu.ru>'s
 	Russian message translation file.
 
 2000-10-16  Dan Harkless  <wget@harkless.org>
@@ -2106,7 +2684,7 @@
 	now says to email the mailing list or bug-wget@gnu.org.
 
 	* MAILING-LIST: Added mention of bug-wget@gnu.org.
-	
+
 	* NEWS: Added --waitretry and --page-requisites.
 
 2000-08-25  Dan Harkless  <wget@harkless.org>
@@ -2116,26 +2694,26 @@
 	made AIX and FreeBSD entries more general to reflect successful
 	use on those platforms by myself and others, removed the
 	non-factual "this version of", and fixed some grammatical errors.
-	
+
 2000-07-21  Dan Harkless  <wget@harkless.org>
 
 	* TODO: But Brian McMahon <bm@iucr.org> wants old behavior as an option.
-	
+
 2000-07-19  Dan Harkless  <wget@harkless.org>
 
 	* TODO: -k should convert "hostless absolute" URLs, like "/index.html".
-	
+
 2000-05-24  Dan Harkless  <wget@harkless.org>
 
 	* TODO: Timestamps sometimes not copied over on files retrieved by FTP.
-	
+
 2000-05-22  Dan Harkless  <wget@harkless.org>
 
 	* AUTHORS: Added myself to this file, as Hrvoje got confirmation
 	of my FSF copyright assignment.
 
 	* TODO: Added note that fragment identifiers don't work properly.
-	
+
 	* po/*.{gmo,po,pot}: Regenerated after modifying wget --help output.
 
 2000-05-17  Dan Harkless  <wget@harkless.org>
@@ -2159,7 +2737,7 @@
 
 	* TODO: Removed done item: we now have an option (-G) that makes
 	it easy to download a single HTML document and all its constituents.
-	
+
 	* po/*.{gmo,po,pot}: Regenerated after adding new options.
 
 	* po/hr.po: Hrvoje forgot '\n's on his translations of my altered
@@ -2312,7 +2890,7 @@
 
 1998-03-16  Hrvoje Niksic  <hniksic@srce.hr>
 
-	* po/POTFILES.in: Removed extraneous newline at end of line, which 
+	* po/POTFILES.in: Removed extraneous newline at end of line, which
 	caused an error in `Makefile' which Sun make choked on.
 
 1998-03-16  Jan Prikryl <prikryl@cg.tuwien.ac.at>
@@ -2386,7 +2964,7 @@
 	* configure.in (ALL_LINGUAS): New variable.  Add "de" and "hr".
 	(AM_GNU_GETTEXT): Add.
 	(AC_OUTPUT): Add po/Makefile.in; run the sed command.
-	
+
 	* aclocal.m4 (AM_WITH_NLS, AM_GNU_GETTEXT, AM_LC_MESSAGES,
 	AM_PATH_PROG_WITH_TEST): from gettext-0.10.32.
-	
+

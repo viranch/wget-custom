@@ -1,6 +1,7 @@
 /* File retrieval.
    Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
-   2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation,
+   Inc.
 
 This file is part of GNU Wget.
 
@@ -32,9 +33,7 @@ as that of the covered work.  */
 
 #include <stdio.h>
 #include <stdlib.h>
-#ifdef HAVE_UNISTD_H
-# include <unistd.h>
-#endif /* HAVE_UNISTD_H */
+#include <unistd.h>
 #include <errno.h>
 #include <string.h>
 #include <assert.h>
@@ -208,9 +207,10 @@ fd_read_body (int fd, FILE *out, wgint toread, wgint startpos,
               wgint *qtyread, wgint *qtywritten, double *elapsed, int flags)
 {
   int ret = 0;
-
-  static char dlbuf[16384];
-  int dlbufsize = sizeof (dlbuf);
+#undef max
+#define max(a,b) ((a) > (b) ? (a) : (b))
+  int dlbufsize = max (BUFSIZ, 8 * 1024);
+  char *dlbuf = xmalloc (dlbufsize);
 
   struct ptimer *timer = NULL;
   double last_successful_read_tm = 0;
@@ -225,11 +225,15 @@ fd_read_body (int fd, FILE *out, wgint toread, wgint startpos,
   bool progress_interactive = false;
 
   bool exact = !!(flags & rb_read_exactly);
+
+  /* Used only by HTTP/HTTPS chunked transfer encoding.  */
+  bool chunked = flags & rb_chunked_transfer_encoding;
   wgint skip = 0;
 
   /* How much data we've read/written.  */
   wgint sum_read = 0;
   wgint sum_written = 0;
+  wgint remaining_chunk_size = 0;
 
   if (flags & rb_skip_startpos)
     skip = startpos;
@@ -269,8 +273,36 @@ fd_read_body (int fd, FILE *out, wgint toread, wgint startpos,
      should be read.  */
   while (!exact || (sum_read < toread))
     {
-      int rdsize = exact ? MIN (toread - sum_read, dlbufsize) : dlbufsize;
+      int rdsize;
       double tmout = opt.read_timeout;
+
+      if (chunked)
+        {
+          if (remaining_chunk_size == 0)
+            {
+              char *line = fd_read_line (fd);
+              char *endl;
+              if (line == NULL)
+                {
+                  ret = -1;
+                  break;
+                }
+
+              remaining_chunk_size = strtol (line, &endl, 16);
+              if (remaining_chunk_size == 0)
+                {
+                  ret = 0;
+                  if (fd_read_line (fd) == NULL)
+                    ret = -1;
+                  break;
+                }
+            }
+
+          rdsize = MIN (remaining_chunk_size, dlbufsize);
+        }
+      else
+        rdsize = exact ? MIN (toread - sum_read, dlbufsize) : dlbufsize;
+
       if (progress_interactive)
         {
           /* For interactive progress gauges, always specify a ~1s
@@ -301,7 +333,7 @@ fd_read_body (int fd, FILE *out, wgint toread, wgint startpos,
       else if (ret <= 0)
         break;                  /* EOF or read error */
 
-      if (progress || opt.limit_rate)
+      if (progress || opt.limit_rate || elapsed)
         {
           ptimer_measure (timer);
           if (ret > 0)
@@ -315,6 +347,16 @@ fd_read_body (int fd, FILE *out, wgint toread, wgint startpos,
             {
               ret = -2;
               goto out;
+            }
+          if (chunked)
+            {
+              remaining_chunk_size -= ret;
+              if (remaining_chunk_size == 0)
+                if (fd_read_line (fd) == NULL)
+                  {
+                    ret = -1;
+                    break;
+                  }
             }
         }
 
@@ -345,6 +387,8 @@ fd_read_body (int fd, FILE *out, wgint toread, wgint startpos,
     *qtyread += sum_read;
   if (qtywritten)
     *qtywritten += sum_written;
+
+  free (dlbuf);
 
   return ret;
 }
@@ -689,7 +733,8 @@ retrieve_url (struct url * orig_parsed, const char *origurl, char **file,
 #endif
       || (proxy_url && proxy_url->scheme == SCHEME_HTTP))
     {
-      result = http_loop (u, &mynewloc, &local_file, refurl, dt, proxy_url, iri);
+      result = http_loop (u, orig_parsed, &mynewloc, &local_file, refurl, dt,
+                          proxy_url, iri);
     }
   else if (u->scheme == SCHEME_FTP)
     {
@@ -700,7 +745,7 @@ retrieve_url (struct url * orig_parsed, const char *origurl, char **file,
       if (redirection_count)
         oldrec = glob = false;
 
-      result = ftp_loop (u, dt, proxy_url, recursive, glob);
+      result = ftp_loop (u, &local_file, dt, proxy_url, recursive, glob);
       recursive = oldrec;
 
       /* There is a possibility of having HTTP being redirected to
@@ -720,7 +765,7 @@ retrieve_url (struct url * orig_parsed, const char *origurl, char **file,
       proxy_url = NULL;
     }
 
-  location_changed = (result == NEWLOCATION);
+  location_changed = (result == NEWLOCATION || result == NEWLOCATION_KEEP_POST);
   if (location_changed)
     {
       char *construced_newloc;
@@ -794,12 +839,17 @@ retrieve_url (struct url * orig_parsed, const char *origurl, char **file,
         }
       u = newloc_parsed;
 
-      /* If we're being redirected from POST, we don't want to POST
+      /* If we're being redirected from POST, and we received a
+         redirect code different than 307, we don't want to POST
          again.  Many requests answer POST with a redirection to an
          index page; that redirection is clearly a GET.  We "suspend"
          POST data for the duration of the redirections, and restore
-         it when we're done. */
-      if (!post_data_suspended)
+         it when we're done.
+	 
+	 RFC2616 HTTP/1.1 introduces code 307 Temporary Redirect
+	 specifically to preserve the method of the request.
+	 */
+      if (result != NEWLOCATION_KEEP_POST && !post_data_suspended)
         SUSPEND_POST_DATA;
 
       goto redirected;
@@ -825,23 +875,18 @@ retrieve_url (struct url * orig_parsed, const char *origurl, char **file,
           DEBUGP (("[Couldn't fallback to non-utf8 for %s\n", quote (url)));
     }
 
-  if (local_file && *dt & RETROKF)
+  if (local_file && u && *dt & RETROKF)
     {
       register_download (u->url, local_file);
-      if (redirection_count && 0 != strcmp (origurl, u->url))
+
+      if (!opt.spider && redirection_count && 0 != strcmp (origurl, u->url))
         register_redirection (origurl, u->url);
+
       if (*dt & TEXTHTML)
         register_html (u->url, local_file);
-      if (*dt & RETROKF)
-        {
-          register_download (u->url, local_file);
-          if (redirection_count && 0 != strcmp (origurl, u->url))
-            register_redirection (origurl, u->url);
-          if (*dt & TEXTHTML)
-            register_html (u->url, local_file);
-          if (*dt & TEXTCSS)
-            register_css (u->url, local_file);
-        }
+
+      if (*dt & TEXTCSS)
+        register_css (u->url, local_file);
     }
 
   if (file)
@@ -889,7 +934,7 @@ retrieve_from_file (const char *file, bool html, int *count)
   struct urlpos *url_list, *cur_url;
   struct iri *iri = iri_new();
 
-  char *input_file = NULL;
+  char *input_file, *url_file = NULL;
   const char *url = file;
 
   status = RETROK;             /* Suppose everything is OK.  */
@@ -899,12 +944,11 @@ retrieve_from_file (const char *file, bool html, int *count)
   set_uri_encoding (iri, opt.locale, true);
   set_content_encoding (iri, opt.locale);
 
-  if (url_has_scheme (url))
+  if (url_valid_scheme (url))
     {
       int dt,url_err;
       uerr_t status;
-      struct url * url_parsed = url_parse(url, &url_err, iri, true);
-
+      struct url *url_parsed = url_parse (url, &url_err, iri, true);
       if (!url_parsed)
         {
           char *error = url_error (url, url_err);
@@ -916,9 +960,11 @@ retrieve_from_file (const char *file, bool html, int *count)
       if (!opt.base_href)
         opt.base_href = xstrdup (url);
 
-      status = retrieve_url (url_parsed, url, &input_file, NULL, NULL, &dt,
+      status = retrieve_url (url_parsed, url, &url_file, NULL, NULL, &dt,
                              false, iri, true);
-      if (status != RETROK)
+      url_free (url_parsed);
+
+      if (!url_file || (status != RETROK))
         return status;
 
       if (dt & TEXTHTML)
@@ -933,12 +979,16 @@ retrieve_from_file (const char *file, bool html, int *count)
       iri->utf8_encode = opt.enable_iri;
       xfree_null (iri->orig_url);
       iri->orig_url = NULL;
+
+      input_file = url_file;
     }
   else
     input_file = (char *) file;
 
   url_list = (html ? get_urls_html (input_file, NULL, NULL, iri)
               : get_urls_file (input_file));
+
+  xfree_null (url_file);
 
   for (cur_url = url_list; cur_url; cur_url = cur_url->next, ++*count)
     {
@@ -956,9 +1006,7 @@ retrieve_from_file (const char *file, bool html, int *count)
           break;
         }
 
-      /* Need to reparse the url, since it didn't have iri information. */
-      if (opt.enable_iri)
-          parsed_url = url_parse (cur_url->url->url, NULL, tmpiri, true);
+      parsed_url = url_parse (cur_url->url->url, NULL, tmpiri, true);
 
       if ((opt.recursive || opt.page_requisites)
           && (cur_url->url->scheme != SCHEME_FTP || getproxy (cur_url->url)))
@@ -1182,4 +1230,21 @@ set_local_file (const char **file, const char *default_file)
     }
   else
     *file = default_file;
+}
+
+/* Return true for an input file's own URL, false otherwise.  */
+bool
+input_file_url (const char *input_file)
+{
+  static bool first = true;
+
+  if (input_file
+      && url_has_scheme (input_file)
+      && first)
+    {
+      first = false;
+      return true;
+    }
+  else
+    return false;
 }

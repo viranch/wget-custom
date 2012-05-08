@@ -1,5 +1,6 @@
+#line 2 "css.c"
 
-#line 3 "css.c"
+#line 4 "css.c"
 
 #define  YY_INT_ALIGNED short int
 
@@ -4691,10 +4692,10 @@ int yy_flex_debug = 0;
 #define YY_RESTORE_YY_MORE_OFFSET
 char *yytext;
 #line 1 "css.l"
-#line 6 "css.l"
+#line 7 "css.l"
 /* Lex source for CSS tokenizing.
    Taken from http://www.w3.org/TR/CSS21/grammar.html#q2
-   Copyright (C) 2006, 2009 Free Software Foundation, Inc.
+   Copyright (C) 2006, 2009, 2010, 2011 Free Software Foundation, Inc.
 
 This file is part of GNU Wget.
 
@@ -4722,11 +4723,11 @@ Corresponding Source for a non-source form of such a combination
 shall include the source code for the parts of OpenSSL used as well
 as that of the covered work.  */
 
+#define YY_NO_INPUT
+
 #include "css-tokens.h"
 
-/* {s}+\/\*[^*]*\*+([^/*][^*]*\*+)*\/      {unput(' '); } */
-/*replace by space*/
-#line 4730 "css.c"
+#line 4731 "css.c"
 
 #define INITIAL 0
 
@@ -4785,8 +4786,6 @@ extern int yywrap (void );
 #endif
 #endif
 
-    static void yyunput (int c,char *buf_ptr  );
-    
 #ifndef yytext_ptr
 static void yy_flex_strncpy (char *,yyconst char *,int );
 #endif
@@ -4913,10 +4912,10 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
     
-#line 81 "css.l"
+#line 82 "css.l"
 
 
-#line 4920 "css.c"
+#line 4919 "css.c"
 
 	if ( !(yy_init) )
 		{
@@ -4998,244 +4997,244 @@ do_action:	/* This label is used only to access EOF actions. */
 case 1:
 /* rule 1 can match eol */
 YY_RULE_SETUP
-#line 83 "css.l"
+#line 84 "css.l"
 {return S;}
 	YY_BREAK
 case 2:
 /* rule 2 can match eol */
 YY_RULE_SETUP
-#line 85 "css.l"
+#line 86 "css.l"
 {return S;} /* ignore comments */
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 87 "css.l"
+#line 88 "css.l"
 {return CDO;}
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 88 "css.l"
+#line 89 "css.l"
 {return CDC;}
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 89 "css.l"
+#line 90 "css.l"
 {return INCLUDES;}
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 90 "css.l"
+#line 91 "css.l"
 {return DASHMATCH;}
 	YY_BREAK
 case 7:
 /* rule 7 can match eol */
 YY_RULE_SETUP
-#line 92 "css.l"
+#line 93 "css.l"
 {return LBRACE;}
 	YY_BREAK
 case 8:
 /* rule 8 can match eol */
 YY_RULE_SETUP
-#line 93 "css.l"
+#line 94 "css.l"
 {return PLUS;}
 	YY_BREAK
 case 9:
 /* rule 9 can match eol */
 YY_RULE_SETUP
-#line 94 "css.l"
+#line 95 "css.l"
 {return GREATER;}
 	YY_BREAK
 case 10:
 /* rule 10 can match eol */
 YY_RULE_SETUP
-#line 95 "css.l"
+#line 96 "css.l"
 {return COMMA;}
 	YY_BREAK
 case 11:
 /* rule 11 can match eol */
 YY_RULE_SETUP
-#line 97 "css.l"
+#line 98 "css.l"
 {return STRING;}
 	YY_BREAK
 case 12:
 /* rule 12 can match eol */
 YY_RULE_SETUP
-#line 98 "css.l"
+#line 99 "css.l"
 {return INVALID; /* unclosed string */}
 	YY_BREAK
 case 13:
 /* rule 13 can match eol */
 YY_RULE_SETUP
-#line 100 "css.l"
+#line 101 "css.l"
 {return IDENT;}
 	YY_BREAK
 case 14:
 /* rule 14 can match eol */
 YY_RULE_SETUP
-#line 102 "css.l"
+#line 103 "css.l"
 {return HASH;}
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 104 "css.l"
+#line 105 "css.l"
 {return IMPORT_SYM;}
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 105 "css.l"
+#line 106 "css.l"
 {return PAGE_SYM;}
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 106 "css.l"
+#line 107 "css.l"
 {return MEDIA_SYM;}
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 107 "css.l"
+#line 108 "css.l"
 {return CHARSET_SYM;}
 	YY_BREAK
 case 19:
 /* rule 19 can match eol */
 YY_RULE_SETUP
-#line 109 "css.l"
+#line 110 "css.l"
 {return IMPORTANT_SYM;}
 	YY_BREAK
 case 20:
 /* rule 20 can match eol */
 YY_RULE_SETUP
-#line 111 "css.l"
+#line 112 "css.l"
 {return EMS;}
 	YY_BREAK
 case 21:
 /* rule 21 can match eol */
 YY_RULE_SETUP
-#line 112 "css.l"
+#line 113 "css.l"
 {return EXS;}
 	YY_BREAK
 case 22:
 /* rule 22 can match eol */
 YY_RULE_SETUP
-#line 113 "css.l"
+#line 114 "css.l"
 {return LENGTH;}
 	YY_BREAK
 case 23:
 /* rule 23 can match eol */
 YY_RULE_SETUP
-#line 114 "css.l"
+#line 115 "css.l"
 {return LENGTH;}
 	YY_BREAK
 case 24:
 /* rule 24 can match eol */
 YY_RULE_SETUP
-#line 115 "css.l"
+#line 116 "css.l"
 {return LENGTH;}
 	YY_BREAK
 case 25:
 /* rule 25 can match eol */
 YY_RULE_SETUP
-#line 116 "css.l"
+#line 117 "css.l"
 {return LENGTH;}
 	YY_BREAK
 case 26:
 /* rule 26 can match eol */
 YY_RULE_SETUP
-#line 117 "css.l"
+#line 118 "css.l"
 {return LENGTH;}
 	YY_BREAK
 case 27:
 /* rule 27 can match eol */
 YY_RULE_SETUP
-#line 118 "css.l"
+#line 119 "css.l"
 {return LENGTH;}
 	YY_BREAK
 case 28:
 /* rule 28 can match eol */
 YY_RULE_SETUP
-#line 119 "css.l"
+#line 120 "css.l"
 {return ANGLE;}
 	YY_BREAK
 case 29:
 /* rule 29 can match eol */
 YY_RULE_SETUP
-#line 120 "css.l"
+#line 121 "css.l"
 {return ANGLE;}
 	YY_BREAK
 case 30:
 /* rule 30 can match eol */
 YY_RULE_SETUP
-#line 121 "css.l"
+#line 122 "css.l"
 {return ANGLE;}
 	YY_BREAK
 case 31:
 /* rule 31 can match eol */
 YY_RULE_SETUP
-#line 122 "css.l"
+#line 123 "css.l"
 {return TIME;}
 	YY_BREAK
 case 32:
 /* rule 32 can match eol */
 YY_RULE_SETUP
-#line 123 "css.l"
+#line 124 "css.l"
 {return TIME;}
 	YY_BREAK
 case 33:
 /* rule 33 can match eol */
 YY_RULE_SETUP
-#line 124 "css.l"
+#line 125 "css.l"
 {return FREQ;}
 	YY_BREAK
 case 34:
 /* rule 34 can match eol */
 YY_RULE_SETUP
-#line 125 "css.l"
+#line 126 "css.l"
 {return FREQ;}
 	YY_BREAK
 case 35:
 /* rule 35 can match eol */
 YY_RULE_SETUP
-#line 126 "css.l"
+#line 127 "css.l"
 {return DIMENSION;}
 	YY_BREAK
 case 36:
 YY_RULE_SETUP
-#line 128 "css.l"
+#line 129 "css.l"
 {return PERCENTAGE;}
 	YY_BREAK
 case 37:
 YY_RULE_SETUP
-#line 129 "css.l"
+#line 130 "css.l"
 {return NUMBER;}
 	YY_BREAK
 case 38:
 /* rule 38 can match eol */
 YY_RULE_SETUP
-#line 131 "css.l"
+#line 132 "css.l"
 {return URI;}
 	YY_BREAK
 case 39:
 /* rule 39 can match eol */
 YY_RULE_SETUP
-#line 132 "css.l"
+#line 133 "css.l"
 {return URI;}
 	YY_BREAK
 case 40:
 /* rule 40 can match eol */
 YY_RULE_SETUP
-#line 133 "css.l"
+#line 134 "css.l"
 {return FUNCTION;}
 	YY_BREAK
 case 41:
 YY_RULE_SETUP
-#line 135 "css.l"
+#line 136 "css.l"
 {return *yytext;}
 	YY_BREAK
 case 42:
 YY_RULE_SETUP
-#line 137 "css.l"
+#line 138 "css.l"
 ECHO;
 	YY_BREAK
-#line 5239 "css.c"
+#line 5238 "css.c"
 case YY_STATE_EOF(INITIAL):
 	yyterminate();
 
@@ -5563,43 +5562,6 @@ static int yy_get_next_buffer (void)
 	yy_is_jam = (yy_current_state == 1152);
 
 	return yy_is_jam ? 0 : yy_current_state;
-}
-
-    static void yyunput (int c, register char * yy_bp )
-{
-	register char *yy_cp;
-    
-    yy_cp = (yy_c_buf_p);
-
-	/* undo effects of setting up yytext */
-	*yy_cp = (yy_hold_char);
-
-	if ( yy_cp < YY_CURRENT_BUFFER_LVALUE->yy_ch_buf + 2 )
-		{ /* need to shift things up to make room */
-		/* +2 for EOB chars. */
-		register int number_to_move = (yy_n_chars) + 2;
-		register char *dest = &YY_CURRENT_BUFFER_LVALUE->yy_ch_buf[
-					YY_CURRENT_BUFFER_LVALUE->yy_buf_size + 2];
-		register char *source =
-				&YY_CURRENT_BUFFER_LVALUE->yy_ch_buf[number_to_move];
-
-		while ( source > YY_CURRENT_BUFFER_LVALUE->yy_ch_buf )
-			*--dest = *--source;
-
-		yy_cp += (int) (dest - source);
-		yy_bp += (int) (dest - source);
-		YY_CURRENT_BUFFER_LVALUE->yy_n_chars =
-			(yy_n_chars) = YY_CURRENT_BUFFER_LVALUE->yy_buf_size;
-
-		if ( yy_cp < YY_CURRENT_BUFFER_LVALUE->yy_ch_buf + 2 )
-			YY_FATAL_ERROR( "flex scanner push-back overflow" );
-		}
-
-	*--yy_cp = (char) c;
-
-	(yytext_ptr) = yy_bp;
-	(yy_hold_char) = *yy_cp;
-	(yy_c_buf_p) = yy_cp;
 }
 
 #ifndef YY_NO_INPUT
@@ -6230,7 +6192,7 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 137 "css.l"
+#line 138 "css.l"
 
 
 

@@ -1,6 +1,7 @@
 /* Handling of recursive HTTP retrieving.
    Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
-   2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation,
+   Inc.
 
 This file is part of GNU Wget.
 
@@ -33,9 +34,7 @@ as that of the covered work.  */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifdef HAVE_UNISTD_H
-# include <unistd.h>
-#endif /* HAVE_UNISTD_H */
+#include <unistd.h>
 #include <errno.h>
 #include <assert.h>
 
@@ -200,7 +199,6 @@ retrieve_tree (struct url *start_url_parsed, struct iri *pi)
      the queue, but haven't been downloaded yet.  */
   struct hash_table *blacklist;
 
-  int up_error_code;
   struct iri *i = iri_new ();
 
 #define COPYSTR(x)  (x) ? xstrdup(x) : NULL;
@@ -565,7 +563,8 @@ download_child_p (const struct urlpos *upos, struct url *parent, int depth,
   if (opt.no_parent
       && schemes_are_similar_p (u->scheme, start_url_parsed->scheme)
       && 0 == strcasecmp (u->host, start_url_parsed->host)
-      && u->port == start_url_parsed->port
+      && (u->scheme != start_url_parsed->scheme
+          || u->port == start_url_parsed->port)
       && !(opt.page_requisites && upos->link_inline_p))
     {
       if (!subdir_p (start_url_parsed->dir, u->dir))

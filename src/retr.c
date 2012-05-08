@@ -238,7 +238,7 @@ fd_read_body (int fd, FILE *out, wgint toread, wgint startpos,
   if (flags & rb_skip_startpos)
     skip = startpos;
 
-  if (opt.verbose)
+  if (opt.verbose || !opt.quiet)
     {
       /* If we're skipping STARTPOS bytes, pass 0 as the INITIAL
          argument to progress_create because the indicator doesn't

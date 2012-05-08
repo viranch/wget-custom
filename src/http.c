@@ -2554,7 +2554,7 @@ read_header:
     fp = output_stream;
 
   /* Print fetch message, if opt.verbose.  */
-  if (opt.verbose)
+  if (opt.verbose || !opt.quiet)
     {
       logprintf (LOG_NOTQUIET, _("Saving to: %s\n"),
                  HYPHENP (hs->local_file) ? quote ("STDOUT") : quote (hs->local_file));
@@ -2985,10 +2985,7 @@ Remote file exists.\n\n"));
 
                   if (finished)
                     {
-                      logprintf (LOG_NONVERBOSE,
-                                 _("%s URL: %s %2d %s\n"),
-                                 tms, u->url, hstat.statcode,
-                                 hstat.message ? quotearg_style (escape_quoting_style, hstat.message) : "");
+                      logprintf (LOG_NONVERBOSE, "\n");
                       goto exit;
                     }
                 }
@@ -3040,12 +3037,7 @@ Remote file exists.\n\n"));
                          write_to_stdout ? "" : quote (hstat.local_file),
                          number_to_static_string (hstat.len),
                          number_to_static_string (hstat.contlen));
-              logprintf (LOG_NONVERBOSE,
-                         "%s URL:%s [%s/%s] -> \"%s\" [%d]\n",
-                         tms, u->url,
-                         number_to_static_string (hstat.len),
-                         number_to_static_string (hstat.contlen),
-                         hstat.local_file, count);
+              logprintf (LOG_NONVERBOSE, "\n");
             }
           ++numurls;
           total_downloaded_bytes += hstat.rd_size;
@@ -3075,10 +3067,7 @@ Remote file exists.\n\n"));
                              tms, tmrate,
                              write_to_stdout ? "" : quote (hstat.local_file),
                              number_to_static_string (hstat.len));
-                  logprintf (LOG_NONVERBOSE,
-                             "%s URL:%s [%s] -> \"%s\" [%d]\n",
-                             tms, u->url, number_to_static_string (hstat.len),
-                             hstat.local_file, count);
+                  logprintf (LOG_NONVERBOSE, "\n");
                 }
               ++numurls;
               total_downloaded_bytes += hstat.rd_size;

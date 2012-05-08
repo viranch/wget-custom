@@ -1245,7 +1245,7 @@ for details.\n\n"));
 
   /* Initialize progress.  Have to do this after the options are
      processed so we know where the log file is.  */
-  if (opt.verbose)
+  if (opt.verbose || !opt.quiet)
     set_progress_implementation (opt.progress_type);
 
   /* Fill in the arguments.  */

@@ -58,7 +58,7 @@ struct hash_table *downloaded_css_set;
 static void convert_links (const char *, struct urlpos *);
 
 
-void
+static void
 convert_links_in_hashtable (struct hash_table *downloaded_set,
                             int is_css,
                             int *file_count)
@@ -124,6 +124,9 @@ convert_links_in_hashtable (struct hash_table *downloaded_set,
           set_uri_encoding (pi, opt.locale, true);
 
           u = url_parse (cur_url->url->url, NULL, pi, true);
+          if (!u)
+	    continue;
+
           local_name = hash_table_get (dl_url_file_map, u->url);
 
           /* Decide on the conversion type.  */
@@ -870,7 +873,7 @@ register_delete_file (const char *file)
 /* Register that FILE is an HTML file that has been downloaded. */
 
 void
-register_html (const char *url, const char *file)
+register_html (const char *file)
 {
   if (!downloaded_html_set)
     downloaded_html_set = make_string_hash_table (0);
@@ -880,7 +883,7 @@ register_html (const char *url, const char *file)
 /* Register that FILE is a CSS file that has been downloaded. */
 
 void
-register_css (const char *url, const char *file)
+register_css (const char *file)
 {
   if (!downloaded_css_set)
     downloaded_css_set = make_string_hash_table (0);

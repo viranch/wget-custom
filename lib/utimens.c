@@ -1,6 +1,6 @@
 /* Set file access and modification times.
 
-   Copyright (C) 2003-2011 Free Software Foundation, Inc.
+   Copyright (C) 2003-2012 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify it
    under the terms of the GNU General Public License as published by the
@@ -21,6 +21,7 @@
 
 #include <config.h>
 
+#define _GL_UTIMENS_INLINE _GL_EXTERN_INLINE
 #include "utimens.h"
 
 #include <assert.h>
@@ -180,18 +181,13 @@ fdutimens (int fd, char const *file, struct timespec const timespec[2])
   if (adjustment_needed < 0)
     return -1;
 
-  /* Require that at least one of FD or FILE are valid.  Works around
+  /* Require that at least one of FD or FILE are potentially valid, to avoid
      a Linux bug where futimens (AT_FDCWD, NULL) changes "." rather
      than failing.  */
-  if (!file)
+  if (fd < 0 && !file)
     {
-      if (fd < 0)
-        {
-          errno = EBADF;
-          return -1;
-        }
-      if (dup2 (fd, fd) != fd)
-        return -1;
+      errno = EBADF;
+      return -1;
     }
 
   /* Some Linux-based NFS clients are buggy, and mishandle time stamps

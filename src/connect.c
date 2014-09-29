@@ -294,8 +294,10 @@ connect_to_ip (const ip_address *ip, int port, const char *print)
        {
            if (ip->family == AF_INET)
                logprintf (LOG_VERBOSE, _("Connecting to %s:%d... "), txt_addr, port);
+#ifdef ENABLE_IPV6
            else if (ip->family == AF_INET6)
                logprintf (LOG_VERBOSE, _("Connecting to [%s]:%d... "), txt_addr, port);
+#endif
        }
     }
 
@@ -557,6 +559,7 @@ socket_ip_address (int sock, ip_address *ip, int endpoint)
   if (ret < 0)
     return false;
 
+  memset(ip, 0, sizeof(ip_address));
   ip->family = sockaddr->sa_family;
   switch (sockaddr->sa_family)
     {

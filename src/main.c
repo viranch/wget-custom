@@ -167,6 +167,8 @@ static struct cmdline_option option_data[] =
     { "backups", 0, OPT_BOOLEAN, "backups", -1 },
     { "base", 'B', OPT_VALUE, "base", -1 },
     { "bind-address", 0, OPT_VALUE, "bindaddress", -1 },
+    { "body-data", 0, OPT_VALUE, "bodydata", -1 },
+    { "body-file", 0, OPT_VALUE, "bodyfile", -1 },
     { IF_SSL ("ca-certificate"), 0, OPT_VALUE, "cacertificate", -1 },
     { IF_SSL ("ca-directory"), 0, OPT_VALUE, "cadirectory", -1 },
     { "cache", 0, OPT_BOOLEAN, "cache", -1 },
@@ -215,6 +217,7 @@ static struct cmdline_option option_data[] =
     { "http-passwd", 0, OPT_VALUE, "httppassword", -1 }, /* deprecated */
     { "http-password", 0, OPT_VALUE, "httppassword", -1 },
     { "http-user", 0, OPT_VALUE, "httpuser", -1 },
+    { IF_SSL ("https-only"), 0, OPT_BOOLEAN, "httpsonly", -1 },
     { "ignore-case", 0, OPT_BOOLEAN, "ignorecase", -1 },
     { "ignore-length", 0, OPT_BOOLEAN, "ignorelength", -1 },
     { "ignore-tags", 0, OPT_VALUE, "ignoretags", -1 },
@@ -231,6 +234,7 @@ static struct cmdline_option option_data[] =
     { "load-cookies", 0, OPT_VALUE, "loadcookies", -1 },
     { "local-encoding", 0, OPT_VALUE, "localencoding", -1 },
     { "max-redirect", 0, OPT_VALUE, "maxredirect", -1 },
+    { "method", 0, OPT_VALUE, "method", -1 },
     { "mirror", 'm', OPT_BOOLEAN, "mirror", -1 },
     { "no", 'n', OPT__NO, NULL, required_argument },
     { "no-clobber", 0, OPT_BOOLEAN, "noclobber", -1 },
@@ -610,6 +614,12 @@ HTTP options:\n"),
     N_("\
        --post-file=FILE        use the POST method; send contents of FILE.\n"),
     N_("\
+       --method=HTTPMethod     use method \"HTTPMethod\" in the header.\n"),
+    N_("\
+       --body-data=STRING      Send STRING as data. --method MUST be set.\n"),
+    N_("\
+       --body-file=FILE        Send contents of FILE. --method MUST be set.\n"),
+    N_("\
        --content-disposition   honor the Content-Disposition header when\n\
                                choosing local file names (EXPERIMENTAL).\n"),
     N_("\
@@ -625,7 +635,9 @@ HTTP options:\n"),
 HTTPS (SSL/TLS) options:\n"),
     N_("\
        --secure-protocol=PR     choose secure protocol, one of auto, SSLv2,\n\
-                                SSLv3, and TLSv1.\n"),
+                                SSLv3, TLSv1 and PFS.\n"),
+    N_("\
+       --https-only             only follow secure HTTPS links\n"),
     N_("\
        --no-check-certificate   don't validate the server's certificate.\n"),
     N_("\
@@ -705,6 +717,9 @@ Recursive download:\n"),
     N_("\
   -k,  --convert-links      make links in downloaded HTML or CSS point to\n\
                             local files.\n"),
+    N_("\
+  --backups=N   before writing file X, rotate up to N backup files.\n"),
+
 #ifdef __VMS
     N_("\
   -K,  --backup-converted   before converting file X, back up as X_orig.\n"),
@@ -828,15 +843,16 @@ format_and_print_line (const char *prefix, const char *line,
 
   assert (prefix != NULL);
   assert (line != NULL);
+  assert (line_length > TABULATION);
 
   line_dup = xstrdup (line);
 
-  if (line_length <= 0)
-    line_length = MAX_CHARS_PER_LINE - TABULATION;
-
   if (printf ("%s", prefix) < 0)
     return -1;
-  remaining_chars = line_length;
+
+  /* Wrap to new line after prefix. */
+  remaining_chars = 0;
+
   /* We break on spaces. */
   token = strtok (line_dup, " ");
   while (token != NULL)
@@ -844,7 +860,7 @@ format_and_print_line (const char *prefix, const char *line,
       /* If however a token is much larger than the maximum
          line length, all bets are off and we simply print the
          token on the next line. */
-      if (remaining_chars <= strlen (token))
+      if (remaining_chars <= (int) strlen (token))
         {
           if (printf ("\n%*c", TABULATION, ' ') < 0)
             return -1;
@@ -918,7 +934,7 @@ print_version (void)
 
 #ifdef ENABLE_NLS
   if (format_and_print_line (locale_title,
-                        LOCALEDIR,
+                             LOCALEDIR,
                              MAX_CHARS_PER_LINE) < 0)
     exit (3);
 #endif /* def ENABLE_NLS */
@@ -1034,7 +1050,6 @@ main (int argc, char **argv)
                                 short_options, long_options, &longindex)) != -1)
     {
       int confval;
-      bool userrc_ret = true;
       struct cmdline_option *config_opt;
 
       /* There is no short option for "--config". */
@@ -1044,16 +1059,17 @@ main (int argc, char **argv)
           config_opt = &option_data[confval & ~BOOLEAN_NEG_MARKER];
           if (strcmp (config_opt->long_name, "config") == 0)
             {
+              bool userrc_ret = true;
               userrc_ret &= run_wgetrc (optarg);
               use_userconfig = true;
+              if (userrc_ret)
+                break;
+              else
+                {
+                  fprintf (stderr, _("Exiting due to error in %s\n"), optarg);
+                  exit (2);
+                }
             }
-          if (!userrc_ret)
-            {
-              fprintf (stderr, "Exiting due to error in %s\n", optarg);
-              exit (2);
-            }
-          else
-            break;
         }
     }
 
@@ -1211,6 +1227,7 @@ main (int argc, char **argv)
   if (opt.verbose == -1)
     opt.verbose = !opt.quiet;
 
+
   /* Sanity checks.  */
   if (opt.verbose && opt.quiet)
     {
@@ -1357,6 +1374,64 @@ for details.\n\n"));
       opt.rejectregex = opt.regex_compile_fun (opt.rejectregex_s);
       if (!opt.rejectregex)
         exit (1);
+    }
+  if (opt.post_data || opt.post_file_name)
+    {
+      if (opt.post_data && opt.post_file_name)
+        {
+          fprintf (stderr, _("You cannot specify both --post-data and --post-file.\n"));
+          exit (1);
+        }
+      else if (opt.method)
+        {
+          fprintf (stderr, _("You cannot use --post-data or --post-file along with --method. "
+                             "--method expects data through --body-data and --body-file options"));
+          exit (1);
+        }
+    }
+  if (opt.body_data || opt.body_file)
+    {
+      if (!opt.method)
+        {
+          fprintf (stderr, _("You must specify a method through --method=HTTPMethod "
+                              "to use with --body-data or --body-file.\n"));
+          exit (1);
+        }
+      else if (opt.body_data && opt.body_file)
+        {
+          fprintf (stderr, _("You cannot specify both --body-data and --body-file.\n"));
+          exit (1);
+        }
+    }
+
+  /* Set various options as required for opt.method.  */
+
+  /* When user specifies HEAD as the method, we do not wish to download any
+     files. Hence, set wget to run in spider mode.  */
+  if (opt.method && strcasecmp (opt.method, "HEAD") == 0)
+    setoptval ("spider", "1", "spider");
+
+  /* Convert post_data to body-data and post_file_name to body-file options.
+     This is required so as to remove redundant code later on in gethttp().
+     The --post-data and --post-file options may also be removed in
+     the future hence it makes sense to convert them to aliases for
+     the more generic --method options.
+     This MUST occur only after the sanity checks so as to prevent the
+     user from setting both post and body options simultaneously.
+  */
+  if (opt.post_data || opt.post_file_name)
+    {
+        setoptval ("method", "POST", "method");
+        if (opt.post_data)
+          {
+            setoptval ("bodydata", opt.post_data, "body-data");
+            opt.post_data = NULL;
+          }
+        else
+          {
+            setoptval ("bodyfile", opt.post_file_name, "body-file");
+            opt.post_file_name = NULL;
+          }
     }
 
 #ifdef ENABLE_IRI

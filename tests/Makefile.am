@@ -82,6 +82,12 @@ EXTRA_DIST = FTPServer.pm FTPTest.pm HTTPServer.pm HTTPTest.pm \
              Test-ftp-iri-fallback.px \
              Test-ftp-iri-recursive.px \
              Test-ftp-iri-disabled.px \
+             Test-ftp-list-Multinet.px \
+             Test-ftp-list-Unknown.px \
+             Test-ftp-list-Unknown-a.px \
+             Test-ftp-list-Unknown-hidden.px \
+             Test-ftp-list-Unknown-list-a-fails.px \
+             Test-ftp-list-UNIX-hidden.px \
              Test-HTTP-Content-Disposition-1.px \
              Test-HTTP-Content-Disposition-2.px \
              Test-HTTP-Content-Disposition.px \
@@ -119,6 +125,7 @@ EXTRA_DIST = FTPServer.pm FTPTest.pm HTTPServer.pm HTTPTest.pm \
              Test-O--no-content-disposition-trivial.px \
              Test-O-nonexisting.px \
              Test-O.px \
+             Test--post-file.px \
              Test-proxied-https-auth.px \
              Test-proxy-auth-basic.px \
              Test-restrict-ascii.px \
@@ -131,6 +138,7 @@ EXTRA_DIST = FTPServer.pm FTPTest.pm HTTPServer.pm HTTPTest.pm \
              Test--spider-r--no-content-disposition.px \
              Test--spider-r--no-content-disposition-trivial.px \
              Test--spider-r.px \
+             Test--httpsonly-r.px \
              run-px certs
 
 check_PROGRAMS = unit-tests

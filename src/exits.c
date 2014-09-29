@@ -58,7 +58,7 @@ get_status_for_err (uerr_t err)
     case RETROK:
       return WGET_EXIT_SUCCESS;
     case FOPENERR: case FOPEN_EXCL_ERR: case FWRITEERR: case WRITEFAILED:
-    case UNLINKERR: case CLOSEFAILED:
+    case UNLINKERR: case CLOSEFAILED: case FILEBADFILE:
       return WGET_EXIT_IO_FAIL;
     case NOCONERROR: case HOSTERR: case CONSOCKERR: case CONERROR:
     case CONSSLERR: case CONIMPOSSIBLE: case FTPRERR: case FTPINVPASV:
@@ -68,7 +68,7 @@ get_status_for_err (uerr_t err)
       return WGET_EXIT_SSL_AUTH_FAIL;
     case FTPLOGINC: case FTPLOGREFUSED: case AUTHFAILED:
       return WGET_EXIT_SERVER_AUTH_FAIL;
-    case HEOF: case HERR:
+    case HEOF: case HERR: case ATTRMISSING:
       return WGET_EXIT_PROTOCOL_ERROR;
     case WRONGCODE: case FTPPORTERR: case FTPSYSERR:
     case FTPNSFOD: case FTPUNKNOWNTYPE: case FTPSRVERR:
@@ -76,7 +76,7 @@ get_status_for_err (uerr_t err)
     case CONTNOTSUPPORTED: case RANGEERR: case RETRBADPATTERN:
     case PROXERR:
       return WGET_EXIT_SERVER_ERROR;
-    case URLERROR: case QUOTEXC: case SSLINITFAILED:
+    case URLERROR: case QUOTEXC: case SSLINITFAILED: case UNKNOWNATTR:
     default:
       return WGET_EXIT_UNKNOWN;
     }

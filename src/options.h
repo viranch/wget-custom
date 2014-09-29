@@ -166,7 +166,7 @@ struct options
   bool timestamping;		/* Whether to use time-stamping. */
 
   bool backup_converted;	/* Do we save pre-converted files as *.orig? */
-  bool backups;			/* Are numeric backups made? */
+  int backups;			/* Are numeric backups made? */
 
   char *useragent;		/* User-Agent string, which can be set
 				   to something other than Wget. */
@@ -200,7 +200,8 @@ struct options
     secure_protocol_auto,
     secure_protocol_sslv2,
     secure_protocol_sslv3,
-    secure_protocol_tlsv1
+    secure_protocol_tlsv1,
+    secure_protocol_pfs
   } secure_protocol;		/* type of secure protocol to use. */
   bool check_cert;		/* whether to validate the server's cert */
   char *cert_file;		/* external client certificate to use. */
@@ -215,9 +216,9 @@ struct options
   char *ca_directory;		/* CA directory (hash files) */
   char *ca_cert;		/* CA certificate file to use */
 
-
   char *random_file;		/* file with random data to seed the PRNG */
   char *egd_file;		/* file name of the egd daemon socket */
+  bool https_only;		/* whether to follow HTTPS only */
 #endif /* HAVE_SSL */
 
   bool cookies;			/* whether cookies are used. */
@@ -228,6 +229,9 @@ struct options
 
   char *post_data;		/* POST query string */
   char *post_file_name;		/* File to post */
+  char *method;                 /* HTTP Method to use in Header */
+  char *body_data;              /* HTTP Method Data String */
+  char *body_file;              /* HTTP Method File */
 
   enum {
     restrict_unix,

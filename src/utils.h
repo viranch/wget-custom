@@ -98,7 +98,6 @@ bool has_wildcards_p (const char *);
 
 bool has_html_suffix_p (const char *);
 
-char *read_whole_line (FILE *);
 struct file_memory *wget_read_file (const char *);
 void wget_read_file_free (struct file_memory *);
 
@@ -154,6 +153,8 @@ bool match_posix_regex (const void *, const char *);
 void stable_sort (void *, size_t, size_t, int (*) (const void *, const void *));
 
 const char *print_decimal (double);
+
+size_t get_max_length (const char *path, int length, int name);
 
 extern unsigned char char_prop[];
 

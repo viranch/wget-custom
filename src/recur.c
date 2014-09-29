@@ -1,6 +1,6 @@
 /* Handling of recursive HTTP retrieving.
    Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
-   2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation,
+   2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012 Free Software Foundation,
    Inc.
 
 This file is part of GNU Wget.
@@ -253,26 +253,23 @@ retrieve_tree (struct url *start_url_parsed, struct iri *pi)
          the second time.  */
       if (dl_url_file_map && hash_table_contains (dl_url_file_map, url))
         {
+	  bool is_css_bool;
+
           file = xstrdup (hash_table_get (dl_url_file_map, url));
 
           DEBUGP (("Already downloaded \"%s\", reusing it from \"%s\".\n",
                    url, file));
 
-          /* this sucks, needs to be combined! */
-          if (html_allowed
-              && downloaded_html_set
-              && string_set_contains (downloaded_html_set, file))
-            {
-              descend = true;
-              is_css = false;
-            }
-          if (css_allowed
-              && downloaded_css_set
-              && string_set_contains (downloaded_css_set, file))
-            {
-              descend = true;
-              is_css = true;
-            }
+	  if ((is_css_bool = (css_allowed
+			      && downloaded_css_set
+			      && string_set_contains (downloaded_css_set, file)))
+	      || (html_allowed
+		  && downloaded_html_set
+		  && string_set_contains (downloaded_html_set, file)))
+	    {
+	      descend = true;
+	      is_css = is_css_bool;
+	    }
         }
       else
         {
@@ -508,15 +505,16 @@ download_child_p (const struct urlpos *upos, struct url *parent, int depth,
     }
 
   /* Several things to check for:
-     1. if scheme is not http, and we don't load it
-     2. check for relative links (if relative_only is set)
-     3. check for domain
-     4. check for no-parent
-     5. check for excludes && includes
-     6. check for suffix
-     7. check for same host (if spanhost is unset), with possible
+     1. if scheme is not https and https_only requested
+     2. if scheme is not http, and we don't load it
+     3. check for relative links (if relative_only is set)
+     4. check for domain
+     5. check for no-parent
+     6. check for excludes && includes
+     7. check for suffix
+     8. check for same host (if spanhost is unset), with possible
      gethostbyname baggage
-     8. check for robots.txt
+     9. check for robots.txt
 
      Addendum: If the URL is FTP, and it is to be loaded, only the
      domain and suffix settings are "stronger".
@@ -527,6 +525,14 @@ download_child_p (const struct urlpos *upos, struct url *parent, int depth,
 
      More time- and memory- consuming tests should be put later on
      the list.  */
+
+#ifdef HAVE_SSL
+  if (opt.https_only && u->scheme != SCHEME_HTTPS)
+    {
+      DEBUGP (("Not following non-HTTPS links.\n"));
+      goto out;
+    }
+#endif
 
   /* Determine whether URL under consideration has a HTTP-like scheme. */
   u_scheme_like_http = schemes_are_similar_p (u->scheme, SCHEME_HTTP);
@@ -641,7 +647,7 @@ download_child_p (const struct urlpos *upos, struct url *parent, int depth,
                  files after downloading or we're just running a spider. */
               if (opt.delete_after || opt.spider)
                 {
-                  logprintf (LOG_VERBOSE, "Removing %s.\n", rfile);
+                  logprintf (LOG_VERBOSE, _("Removing %s.\n"), rfile);
                   if (unlink (rfile))
                       logprintf (LOG_NOTQUIET, "unlink: %s\n",
                                  strerror (errno));
